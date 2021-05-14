@@ -79,6 +79,8 @@ vignettes/*.pdf
 
 /HDR-UK_Webmapping_in_R-master/
 /HDR-UK_Webmapping_in_R-master
+/Manuscript/
+/Manuscript
 
 #statscan
 *.geo
