@@ -1,0 +1,395 @@
+---
+title: "Surveillance 3D"
+author: "Massimo Cavallaro"
+date: "22 October 2019"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+```{r}
+library(spatstat)
+temporal.trend.function<-function(t,A=7, B=0.9){
+  return (A/2*(sin(t) + 1) + B)
+}
+
+spatial.trend.function<-function(x,y, C=80, B=0.5, x0=0.5, y0=0.5){
+  return(B + 20*exp(-C * ( (x-x0)^2 + (y - y0)^2)))
+}
+n.weeks = 20
+
+delta = 0.01
+delta2 = delta ^ 2
+xx = seq(0,1,delta)
+yy= seq(0,1,delta)
+
+Z = lapply(1:n.weeks, function(t)
+  outer(xx, yy, function(x,y){temporal.trend(t) * spatial.trend.function(x,y)}))
+
+win = owin(poly = data.frame(x=rev(c(0.1,0.2,0.3,0.4,0.44,0.31,0.22)),
+                             y=rev(c(0.8,0.91,0.8,0.6,0.55,0.45,0.55))) )
+
+my_blues = c("#F7FBFF", "#DEEBF7", "#C6DBEF", "#9ECAE1", "#6BAED6","#4292C6","#2171B5")
+#blues9
+ColorRamp=colorRampPalette(c(my_blues))(1000)
+```
+
+```{r}
+set.seed(1)
+baseline=lapply(1:n.weeks, function(t){
+  rpoispp(function(x,y){ temporal.trend.function(t) * spatial.trend.function(x,y) })})
+set.seed(1)
+epidemics=lapply(c(0,0,0,0,1,1,1,1,0,0, 0,0,0,0,1,1,1,1,0,0), function(t){
+  rpoispp(t * 35, win=win)})
+
+Max = max(unlist(lapply(Z, max)))
+```
+
+```{r}
+# include=FALSE}
+# png('../Manuscript/data_points__.png', width = 3.25 *2, height = 3.25 *2, units = 'in', res=600, pointsize = 18)
+
+par(mfrow=c(3,3), mar=c(0.9, 0.9, 0.9, 0.5))
+for (i in 1:9){
+  ex = max(Z[[i]])/ Max
+  ColorRamp_ex = ColorRamp[1:(ex * len(ColorRamp))]
+
+  plot(baseline[[i]], cols='#473B54', pch=16, main=paste0('t=', as.character(i)), show.window = F)
+  image(xx, yy, Z[[i]], add=T, col=ColorRamp_ex)
+  plot(baseline[[i]], cols='#473B54', pch=16, add=T)
+  if ((i == 7) | (i == 8) | (i == 9))
+    mtext(c('x' ), c(1), outer = F)
+  if ((i == 1) | (i == 4) | (i == 7))
+    mtext(c('y' ), c(2), outer = F)
+  if (i == 3)
+    mtext('A', at = 0.9, cex = 1.8, padj = 1.5)
+
+  if (i %in% 5:8){
+    plot(win, add=T, border='red')
+  }
+  plot.ppp(epidemics[[i]], cols='red', pch=16, add=T)
+}
+# dev.off()
+#palette = colorRampPalette(c('blue', 'red'))(max(cases2[,2]))
+
+
+```
+
+
+```{r include=FALSE}
+observations = list()
+for (i in 1:n.weeks){
+  b = baseline[[i]]
+  s = epidemics[[i]]
+  observations[[i]] = data.frame(x=c(b$x, s$x), 
+                                 y=c(b$y, s$y),
+                                # color=c(rep('#473B54', length(b$x)), rep('red', length(s$x))))
+                                 warning=c(rep(F, length(b$x)), rep(T, length(s$x))),
+  t=rep(i, length(c(b$x, s$x))))
+}
+observations = do.call(rbind,  observations)
+```
+
+
+```{r}
+writeLines(c("The number of observations is:", nrow(observations)))
+```
+
+
+```{r}
+# x = seq(0,1,delta)
+# y = seq(0,1,delta)
+# z = lapply(1:10,
+#            function(i){outer(x, y, function(x,y){temporal.trend(i) * spatial.trend.function(x,y)})})
+
+is_in_circle0<-function(Data, x, y, rho){
+  d = sqrt((as.numeric(Data['x'])-x)^2 + (as.numeric(Data['y'])-y)^2 )
+  res<-ifelse((d<rho) & (!is.na(d)), T, F)
+  return(res)
+}
+
+compute_cylinders<-function(cylinder, observations, tabulated.baseline){
+  t.low = as.numeric(cylinder['t.low'])
+  t.upp = as.numeric(cylinder['t.upp'])
+  x0 = as.numeric(cylinder['x'])
+  y0 = as.numeric(cylinder['y'])
+  rho = as.numeric(cylinder['rho'])
+
+  in_circle<-apply(tabulated.baseline, 1, is_in_circle0, x0, y0, rho)
+  in_height = (tabulated.baseline$t >= t.low) & (tabulated.baseline$t <= t.upp)
+  mu = sum(tabulated.baseline[in_circle & in_height,]$z) * delta2 #multiply by delta2 as this is the bin size
+  
+#   in_of_square = sum(in_circle & in_height) * delta2
+# #  out_of_square = pi * rho* rho - in_of_square
+#   # correct by taking into account that outsise the square there is nothing. 
+#   mu = mu * pi * rho *rho / in_of_square
+  
+  in_circle<-apply(observations, 1, is_in_circle0, x0, y0, rho)
+  in_height = (observations$t >= t.low) & (observations$t <= t.upp)
+  n_cases_in_cylinder = sum(in_circle & in_height)
+  
+  ci = qpois(c(0.25,0.95) , lambda=mu)
+  p.val = ppois(n_cases_in_cylinder, lambda=mu, lower.tail=FALSE)
+  return (c(n_cases_in_cylinder, mu, ci, p.val))
+}
+```
+
+
+check timeliness
+
+```{r}
+cylinders.list = list()
+for  (t.index in 5:n.weeks){
+  n.cylinders = 4000 / n.weeks * t.index
+  
+  t.max = min(5, t.index)
+  radia = sapply(1:t.max, function(h){sqrt(1 / mean.baseline / pi / h )} )
+  radia_and_heights = cbind(1:t.max, radia)
+
+  radia_and_heights = radia_and_heights[sample(1:nrow(radia_and_heights), n.cylinders, replace=T),]
+  rho = radia_and_heights[,2]
+  random_radia = runif(n.cylinders, 0, rho)
+  theta = runif(n.cylinders, 0, 2* pi)
+  
+  observations.tmp = observations[observations$t <= t.index,]
+  tabulated.baseline.tmp = tabulated.baseline[tabulated.baseline$t <= t.index,]
+  
+  idx = sample(1:nrow(observations.tmp), n.cylinders, replace=T)
+  y0 = observations.tmp$y[idx] + sin(theta) * random_radia
+  x0 = observations.tmp$x[idx] + cos(theta) * random_radia
+  t = observations.tmp$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1]/2))
+  
+  t.low = t - round(radia_and_heights[,1]/2)
+  t.low = ifelse(t.low > 0, t.low, 1)
+  t.upp = t.low + round(radia_and_heights[,1]/2)
+  t.max = max(observations.tmp$t)
+  t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
+  
+  cylinders.tmp = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations.tmp$x[idx],  original.y=observations.tmp$y[idx])
+  
+  cylinders.tmp[,c('n_obs', 'mu', 'lower', 'upper', 'p.val')] = t(apply(cylinders.tmp, 1, compute_cylinders,
+                                                    observations.tmp, tabulated.baseline.tmp))
+  
+  cylinders.tmp$warning = apply(cylinders.tmp, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
+  
+  cylinders.list[[t.index]] = cylinders.tmp
+}
+```
+
+
+```{r}
+
+warning.score<-function(observation, cylinders){
+  # check if the location
+  x = as.numeric(observation['x'])
+  y = as.numeric(observation['y'])
+  TT = as.numeric(observation['t'])
+  in_circle = apply(cylinders, 1, function(X){
+    ifelse(sqrt((as.numeric(X['x']) - x)^2 + (as.numeric(X['y']) - y)^2) < as.numeric(X['rho']), 1, 0)
+  })
+  in_cylinder_height = apply(cylinders, 1,  function(X){
+    ifelse((as.numeric(X['t.low']) <= TT) & (as.numeric(X['t.upp']) >= TT), 1, 0)
+  })
+  # number of cylinders that include geo-coordinate of `case`
+  in_cylinder = sum(in_circle * in_cylinder_height, na.rm=T)
+
+  # number of cylinder with `warning` flag that include location `i`
+  warning = sum(cylinders$warning * in_circle * in_cylinder_height,na.rm=T)
+  if (in_cylinder>0){
+    re = warning / in_cylinder
+  }else{
+    re = 0
+  } 
+  return(re)
+}
+```
+
+```
+init = Sys.time()
+observations$warning.score2 = apply(observations, 1, warning.score, cylinders)
+print(Sys.time() - init)
+```
+
+Timeliness warning score
+
+```{r}
+observations.list = list()
+for (t.index in 5:n.weeks){
+  observations.list[[t.index]] = observations[observations$t <= t.index,]
+}
+```
+
+
+
+```{r}
+for (t.index in 5:n.weeks){
+  observations.list[[t.index]]$warning.score = apply(observations.list[[t.index]], 1, warning.score, cylinders.list[[t.index]])
+}
+```
+
+
+
+<!-- ```{r} -->
+<!-- #png('../Fig/timeliless_25.png', res=600, width=5, height=4, units="in") -->
+<!-- plot(c(1,n.weeks), c(0.2,1), type = 'n', ylab = 'AUC', xlab = expression(tau)) -->
+<!-- # -->
+<!-- cols = c("#1f77b455", "#ff7f0e55", "#2ca02c55", "#d6272855", "#9467bd55", "#8c564b55", "#e377c255", "#7f7f7f55", "#bcbd2255", "#17becf55") -->
+
+<!-- x = c(5, 6, 7, 8, 15, 16, 17, 18) -->
+<!-- for (I in 1:length(x)){ -->
+<!--   aucs = 0 -->
+<!--   t.index = x[I] -->
+<!--   xx = 0 -->
+<!--   for (tau in t.index:n.weeks){ -->
+<!--     idx = observations.list[[tau]]$t == t.index -->
+<!--     if (length(unique(observations.list[[tau]][idx,]$warning))>1){ -->
+<!--       cc = pROC::roc(as.integer(warning) ~ warning.score,  observations.list[[tau]][idx,]) -->
+<!--       cc = cc$auc -->
+<!--       aucs =c(aucs, cc) -->
+<!--       xx = c(xx, tau) -->
+<!--     } -->
+<!--   } -->
+<!--   print(c(x[I], length(xx))) -->
+<!--   lines(xx[-1], aucs[-1], col=cols[I], lwd=3) -->
+<!-- } -->
+<!-- legend("bottomleft",legend = sapply(x, function(x){paste0("t=", as.character(x))}), col=cols[1:length(x)], lwd = 3) -->
+<!-- # dev.off() -->
+<!-- ``` -->
+
+```{r}
+init_size = observations.list[[20]]$t %>% table %>% as.data.frame()
+for (t in 5:19){
+  idx = init_size$. == t
+  if (sum(idx) > 0){
+    ws= matrix(ncol = init_size$Freq[idx])
+    idx = observations.list[[20]]$t == t
+    color = ifelse(observations.list[[20]][idx,]$warning, 'red', 'blue')
+    
+    for (tau in t:20){
+#      idx = observations.list[[tau]]$t == t
+      w = observations.list[[tau]][observations.list[[tau]]$t == t,]$warning.score
+      ws = rbind(ws, w)
+    }
+    ws = ws[-1,]
+    
+    if (!is.matrix(ws)){
+      ws = matrix(ws, nrow=len(ws))
+    }
+    
+    # png(paste0('../Manuscript/timeliness_', as.character(t) , '.png'), width = 5, height = 4, units = 'in', res=600, pointsize = 10)
+    plot(c(t,t+nrow(ws)-1),range(ws), type='n', xlab = expression(tau), ylab=expression(bold('w')), main = paste0('t=',as.character(t)))
+    for(i in 1:ncol(ws)){
+      lines(t:(t+nrow(ws)-1), ws[,i], col=color[i], lty =  2)
+      points(t:(t+nrow(ws)-1), ws[,i], col=color[i], pch = 19)
+      legend('bottomright', c('outbreak','endemic'), pch=19, col=c('red', 'blue'))
+    }
+    # dev.off()
+  }
+}
+```
+
+
+<!-- ```{r} -->
+<!-- tab.red = '#d62728' -->
+<!-- tab.blue = '#1f77b4' -->
+<!-- init_size = observations.list[[20]]$t %>% table %>% as.data.frame() -->
+<!-- png(paste0('../Manuscript/timeliness_','.png'), width = 5 * 2, height = 4, units = 'in', res=600, pointsize = 12) -->
+<!-- par(mfrow=c(1, 2)) #, mar=c(0.9,0.9,0.9,0.7)) -->
+<!-- plot( -->
+<!--   c(5,20), c(0,1), type='n', xlab = expression(tau), ylab=expression(bold('w')), axes=FALSE) -->
+<!-- for (t in 5:6){ -->
+<!--   idx = init_size$. == t -->
+<!--   if (sum(idx) > 0){ -->
+<!--     ws= matrix(ncol = init_size$Freq[idx]) -->
+<!--     idx = observations.list[[20]]$t == t -->
+<!--     color = ifelse(observations.list[[20]][idx,]$warning, tab.red, tab.blue) -->
+
+<!--     for (tau in t:20){ -->
+<!--       idx = observations.list[[tau]]$t == t -->
+<!--       w = observations.list[[tau]][idx,]$warning.score -->
+<!--       ws = rbind(ws, w) -->
+<!--     } -->
+<!--     ws = ws[-1,] -->
+
+<!--     if (t==5){ -->
+<!--       pch=15 -->
+<!--       lty=2 -->
+<!--     }else if(t==6){ -->
+<!--       pch=17 -->
+<!--       lty=3 -->
+<!--     } -->
+
+<!--     for(i in 1:ncol(ws)){ -->
+<!--       lines(t:(t+nrow(ws)-1), ws[,i], col=color[i], lty =  lty) -->
+<!--       points(t:(t+nrow(ws)-1), ws[,i], col=color[i], pch = pch, cex=0.5) -->
+<!--     } -->
+<!--     axis(side = 1, at = 5:20) -->
+<!--     axis(side = 2) -->
+<!--   } -->
+<!-- } -->
+<!-- legend('bottomright', c('outbreak, t=5','endemic, t=5', 'outbreak, t=6','endemic, t=6'), -->
+<!--        lty=c(2,2,3,3), lwd=c(1,1,1,1), -->
+<!--        col=c(tab.red, tab.blue, tab.red, tab.blue), -->
+<!--        pch=c(15,17,17,17), pt.cex=0.5) -->
+<!-- # legend('bottom', c('t=5','t=6'), pch=c(5,6) ) -->
+<!-- plot( -->
+<!--   c(5,20), c(0,1), type='n', xlab = expression(tau), ylab=expression(bold('w')), axes=FALSE) -->
+<!-- for (t in 7){ -->
+<!--   idx = init_size$. == t -->
+<!--   if (sum(idx) > 0){ -->
+<!--     ws= matrix(ncol = init_size$Freq[idx]) -->
+<!--     idx = observations.list[[20]]$t == t -->
+<!--     color = ifelse(observations.list[[20]][idx,]$warning,  tab.red, tab.blue) -->
+
+<!--     for (tau in t:20){ -->
+<!--       idx = observations.list[[tau]]$t == t -->
+<!--       w = observations.list[[tau]][idx,]$warning.score -->
+<!--       ws = rbind(ws, w) -->
+<!--     } -->
+<!--     ws = ws[-1,] -->
+<!--     for(i in ncol(ws):1){ -->
+<!--       lines(t:(t+nrow(ws)-1), ws[,i], col=color[i], lty =  2) -->
+<!--       points(t:(t+nrow(ws)-1), ws[,i], col=color[i], pch = 1, cex = 0.5) -->
+<!--     } -->
+<!--     axis(side = 1, at = 5:20) -->
+<!--     axis(side = 2) -->
+<!--   } -->
+<!-- } -->
+<!-- legend('bottomright', c('outbreak, t=7','endemic, t=7'), lwd=c(1,1,NA), -->
+<!--        lty=c(1,1), pch=c(1,1), col=c( tab.red, tab.blue), pt.cex=0.5) -->
+<!-- # legend('bottom', c('t=7'), pch=c(1) ) -->
+<!-- dev.off() -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- init_size = observations.list[[20]]$t %>% table %>% as.data.frame() -->
+<!-- png(paste0('../Manuscript/timeliness_2','.png'), width = 5, height = 4, units = 'in', res=600, pointsize = 10) -->
+<!-- par(mfrow=c(1, 1)) #, mar=c(0.9,0.9,0.9,0.7)) -->
+<!-- plot( -->
+<!--   c(5,20), c(0,1), type='n', xlab = expression(tau), ylab=expression(bold('w'))) -->
+<!-- for (t in 5:7){ -->
+<!--   idx = init_size$. == t -->
+<!--   if (sum(idx) > 0){ -->
+<!--     ws= matrix(ncol = init_size$Freq[idx]) -->
+<!--     idx = observations.list[[20]]$t == t -->
+<!--     color = ifelse(observations.list[[20]][idx,]$warning, 'red', 'blue') -->
+
+<!--     for (tau in t:20){ -->
+<!--       idx = observations.list[[tau]]$t == t -->
+<!--       w = observations.list[[tau]][idx,]$warning.score -->
+<!--       ws = rbind(ws, w) -->
+<!--     } -->
+<!--     ws = ws[-1,] -->
+<!--     for(i in 1:ncol(ws)){ -->
+<!--       lines(t:(t+nrow(ws)-1), ws[,i], col=color[i], lty =  t -3) -->
+<!-- #      points(t:(t+nrow(ws)-1), ws[,i], col=color[i], pch = t) -->
+<!--     } -->
+<!--   } -->
+<!-- } -->
+<!-- legend('bottomright', c('outbreak','endemic', 't=5','t=6', 't=7'), lty=c(1,1,2,3,4), col=c('red', 'blue', 'black', 'black', 'black')) -->
+<!-- dev.off() -->
+<!-- ``` -->
+
+
+

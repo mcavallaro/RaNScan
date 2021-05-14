@@ -1,0 +1,152 @@
+---
+title: "iGAS Surveillance"
+author: "Massimo Cavallaro"
+date: "26 June 2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(sf)
+library(spatstat)
+library(optimx)
+library(magrittr) # Ctrl+Shift+M
+```
+
+Import the matrix of observations, at least one of the four matrices with the baseline values, and a data frame that maps post codes to geo coordinates
+
+```{r}
+## Create_iGAS_matrices.Rmd
+load("iGAS_observation_matrix.Rdata")
+load("iGAS_baseline_matrix_3.Rdata")
+load("~/Outbreak/postcode2coord.Rdata")
+```
+
+
+Make sure to have a geo-coordinate dataframe that matches the rows of the obs and baseline matrices.
+```{r}
+postcode.locations = merge(
+  data.frame(post.codes = dimnames(observation.matrix)[[1]]),
+  postcode2coord,
+  by = "post.codes",
+  all.x=TRUE,
+  all.y =FALSE,
+  sort=FALSE
+  )
+```
+
+The number of baseline events $N$ in a random cilinder given the baseline rate $\lambda(x,y,t)$ is a non-homogenous Poisson random variable $N\sim Poi(\sum_t \int_A d x d y \lambda(x,y,t))$  where t is the week index, A is the surface of the base circle, 
+
+We use the baseline to find a confidence interval (2.5% and 97.5% quantiles) of $N$ for a large number of random spatio-temporal circles, and assess whether the non-baseline number of events falls into this interval.
+
+
+```{r}
+source("surveillance_utils.R")
+Y.range = range(dat[!is.na(dat$latitude),]$latitude) + c(-2,2) * var(dat[!is.na(dat$latitude),]$latitude)
+# [1] 50.83559 55.64878
+X.range = range(dat[!is.na(dat$longitude),]$longitude) +  c(-2,2) * var(dat[!is.na(dat$longitude),]$longitude)
+# [1] -4.717408  0.348140
+```
+
+
+```{r}
+source("plot_utils.R")
+```
+
+
+
+We consider the emm types separately, let us begin from `1.0`.
+```{r}
+emmtype = emmtypes[1]
+# -1 in observation.matrix index means that we are excluding from week NA
+tmp.observation.matrix = observation.matrix[,emmtype,-1]
+tmp.baseline.matrix = baseline.matrix.2[,emmtype,-1]
+```
+
+
+
+```{r}
+# -c(1,2)in colnames vector means that we are starting from week 2
+weeks = as.integer(colnames(tmp.observation.matrix))[-c(1,2)]
+weeks = weeks[seq(1, length(weeks), 20)]
+for (week in weeks){
+  # consider cilender not longer than 40 weeks
+  week.range = c(max(0, week - 40), week)
+  file.name = paste0("Exceedances", as.character(week2Date(week.range[1])), "_to_", as.character(week2Date(week.range[2])), ".png")
+  cat("Exceedances up to", as.character(week2Date(week.range[2])), ".\r")
+  
+  # generate cyclinders
+  cylinders = rcylinder(10000, X.range, Y.range, week.range, rs=0.1)
+  cylinders[,c('n_obs', 'mu', 'lower', 'upper', 'p.val')] = t(apply(cylinders, 1, compute,
+                                                                    tmp.observation.matrix,  tmp.baseline.matrix, postcode.locations))
+  
+  cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
+  
+  png(file.name, width = 3.25,height = 3.25, units = 'in', res=1200, pointsize = 4)
+  par(mar=c(2,2,4,2))
+  plot_map( X.range+c(1,-1), Y.range, main=paste("Exceedances from", week2Date(week.range[1]), "to", week2Date(week.range[2])))
+  plot_cylinders(cylinders[cylinders$warning,], lwd=0.4)
+  plot_cases(tmp.observation.matrix, week.range,  postcode.locations)
+  
+  # finally, for each location, count how many cylinders are warning and how many are not.
+  warning.ratio = sapply(1:nrow(postcode.locations),
+                         FUN=warning_ratio,
+                         tmp.observation.matrix[,week.range[1]:week.range[2]], cylinders, postcode.locations)
+  
+  idx = which(warning.ratio > 0.05)
+  plot_cases(tmp.observation.matrix[idx,], week.range,  postcode.locations[idx,], col='red')
+  dev.off()
+  # save cases on file
+  tmp.table = tmp.observation.matrix[idx, week.range[1]:week.range[2]]
+  colnames(tmp.table) = sapply(colnames(tmp.table), function(x){as.character(week2Date(as.integer(x)))})
+  write.table(tmp.table,
+              file=paste("Exceed", as.character(week2Date(week.range[1])), as.character(week2Date(week.range[2])),  ".csv", sep = '_'), sep=' ', row.names = T, col.names = T, quote = T)
+  
+}
+```
+
+
+
+<!-- ```{r} -->
+<!-- portions.to.plot = random_portions(10, 100, X.range, Y.range, border =0, rs=0.5, n.days=3) -->
+
+<!-- time_intervals = apply(portions.to.plot, 1, function(x){(seq(x['t.low'], x['t.upp']))}) -->
+<!-- time_layer = do.call(c, time_intervals) -->
+
+<!-- portions.to.plot$time_interval_length<-portions.to.plot$t.upp - portions.to.plot$t.low + 1 -->
+
+<!-- portions.to.plot = portions.to.plot[ -->
+<!--   as.numeric(rep(row.names(portions.to.plot), portions.to.plot$time_interval_length)), -->
+<!--   ] -->
+<!-- portions.to.plot$time_layer = time_layer -->
+
+<!-- par(mfrow=c(3, 3), mar=c(0.4, 0.4, 0.4, 0.4)) -->
+<!-- for (i in min(portions.to.plot$time_layer):max(portions.to.plot$time_layer)){ -->
+<!--   plot(latitude ~ longitude, data=dat, pch=20, asp=1, xaxt='n', yaxt='n') -->
+
+<!--   # plot(baseline[[i]], main=paste('week ', as.character(i)), cols='#473B54', pch=16) -->
+<!--   # plot.ppp(epidemics[[i]], cols='red', add=T, pch=16) -->
+<!--   tmp_portion = portions.to.plot[portions.to.plot$time_layer== i,] -->
+<!--   n_d = dim(tmp_portion)[1] -->
+<!--   if (n_d > 0){ -->
+<!--     for (j in 1:n_d[1]){ -->
+<!--       plot.owin(disc(tmp_portion[j,3], c(tmp_portion[j,1], tmp_portion[j,2])), add=TRUE) -->
+<!--     } -->
+<!--   } -->
+<!-- } -->
+<!-- ``` -->
+
+
+
+```{r}
+# points(warning_centers$x, warning_centers$y, col='red', pch=20, cex=0.1)
+warnings=portions2[portions2$warning == TRUE, ]
+non_warnings=portions2[portions2$warning == FALSE, ]
+```
+
+
+
+
+
+
+
