@@ -1,7 +1,7 @@
 library(jsonlite)
 
-save.and.tell<-function(variable.string, file=file.name, envir=environment()){
-  save(list=variable.string, file=file, envir = envir)
+save.and.tell<-function(variable.string, file=file.name){
+  save(list=variable.string, file=file, envir = parent.frame())
   writeLines(sprintf("The variable `%s` has been saved on disk in file `%s`.", variable.string, file))
   writeLines(sprintf('Load on memory with `load("%s", verbose=1)`.', file))  
 }

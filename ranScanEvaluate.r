@@ -36,9 +36,7 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
   print(sum(observation.matrix))
   
   if (sum(baseline.matrix) > 2 * sum(observation.matrix)){
-    print(c(sum(baseline.matrix),  sum(observation.matrix) ))
-    writeLines("Warning: the baseline is too high. Have you multiplied for the emmtype factor?")
-    writeLines("E.g., `ranScanCreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['12.0']], '12.0', starting.week, n.cylinders=100, rs=0.1)`")
+    warning("Warning: the baseline is too high. Have you multiplied for the emmtype factor? e.g., `ranScanCreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['12.0']], '12.0', starting.week, n.cylinders=100, rs=0.1)`")
   }
   init=Sys.time()
   coord.df = coord.df[!is.na(coord.df$latitude),]

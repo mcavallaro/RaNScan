@@ -78,7 +78,7 @@ ranScanClean<-function(pattern){
 }
 
 ranScanCreateObservationMatrices<-function(case.file, emmtypes){
-  # emmtype is an array of strings, e.g., 
+  # emmtype is an vector of strings, e.g., 
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
     case.df
@@ -89,18 +89,18 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes){
     }
   )
   postcodes = unique(case.df$`Patient Postcode`)
-  # emmtypes = unique(case.df$emmtype)
   n.postcodes= length(postcodes)
+  print(n.postcodes)
   n.emmtypes = length(emmtypes)
   n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
   for (e in 1:n.emmtypes){
     emmtype=emmtypes[e]
     cat("Step ",e, " of ", n.emmtypes, ", creating matrix for", emmtype, "emm type\n")
-    idx = case.df$emmtype == emmtypes[e]
+    idx = case.df$emmtype == emmtype
     case.df.idx = case.df[idx,]
-    observation.matrix = array(data=0,
+    observation.matrix = as(matrix(data=0,
                              dim = c(n.postcodes, n.weeks + 2),
-                             dimnames=list(postcodes, c('NA', as.character(0:n.weeks)) ))
+                             dimnames=list(postcodes, c('NA', as.character(0:n.weeks)) )), "sparseMatrix")
     # the dimensions correspond to postcode, emmtype, time  
     for (i in 1:nrow(case.df.idx)){
 #      emmtype = case.df[i,'emmtype']
@@ -111,7 +111,9 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes){
       }
       observation.matrix[postcode, as.character(week)] = observation.matrix[postcode, as.character(week)] + 1
     }
-    save.and.tell("observation.matrix", file=file.path(dirname(case.file), paste0(emmtype, '_obs.Rdata')))
+    print(dim(observation.matrix))
+    save.and.tell("observation.matrix",
+                  file=file.path(dirname(case.file), paste0(emmtype, '_obs.Rdata')))
   }
 }
 
@@ -137,13 +139,13 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
   #' In testing phase, e.g., to evaluate timeliness one can set an earlier `starting.week`'.
   #'  
   #' @param case.file A string
-  #' @param emmtypes An array of emmtypes.
+  #' @param emmtypes An vector of emmtypes.
   #' @param starting.week integer. This is the week corresponding to the last columns of observation and baseline matrices.
   #' @param n.weeks no. columns of each matrix
   #' @examples
   #' ranScanCreateObservationMatrices_(case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx", c('1.0', '12.0'), , )
   library(Matrix)
-  # emmtype is an array of strings, e.g., 
+  # emmtype is an vector of strings, e.g., 
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
     case.df
@@ -172,8 +174,8 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
   observation.matrices.untyped = list()
   for (week in starting.week:MAX){
     # this represents the week at week the scores are calculated
-    dimnames = list(postcodes, c(as.character( (week - n.weeks+1):(week) ) ))
-    observation.matrices.untyped[[as.character(week)]] = as(matrix(data=0,#rep(0, n.postcodes*n.weeks),
+    dimnames = list(postcodes, c(as.character( (week - n.weeks+1):(week)) ))
+    observation.matrices.untyped[[as.character(week)]] = as(matrix(data=0,
                                                                    nrow=n.postcodes,
                                                                    ncol=n.weeks, 
                                                                    dimnames=dimnames), "sparseMatrix")
@@ -183,7 +185,7 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
     observation.matrices.typed[[emmtype]] = list()
     for (week in starting.week:MAX){
       dimnames = list(postcodes, c(as.character( (week-n.weeks+1):(week) ) ))
-      observation.matrices.typed[[emmtype]][[as.character(week)]] = as(matrix(data=0,#rep(0, n.postcodes*javascript:;n.weeks),
+      observation.matrices.typed[[emmtype]][[as.character(week)]] = as(matrix(data=0,
                                                                               nrow=n.postcodes,
                                                                               ncol=n.weeks,
                                                                               dimnames=dimnames), "sparseMatrix")
@@ -236,11 +238,9 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
   # print(head(rownames(observation.matrices.untyped[[1]])))
   # print(file.path(dirname(case.file), paste0('untyped', '_obs.Rdata')))
   save.and.tell("observation.matrices.untyped",
-                file=file.path(dirname(case.file), paste0('untyped', '_obs.Rdata')),
-                envir = environment())
+                file=file.path(dirname(case.file), paste0('untyped', '_obs.Rdata')))
   save.and.tell("observation.matrices.typed",
-                file=file.path(dirname(case.file),paste0(c(emmtypes, '_typed_obs.Rdata'), collapse='')),
-                envir = environment())
+                file=file.path(dirname(case.file),paste0(c(emmtypes, '_typed_obs.Rdata'), collapse='')))
   
   # save("observation.matrices.untyped", file=file.path(dirname(case.file), paste0('untyped', '_obs.Rdata')))
   # save("observation.matrices.typed", file=file.path(dirname(case.file), paste0(c(emmtypes, '_typed_obs.Rdata'), collapse='')))
@@ -250,15 +250,117 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
   #     file.path(dirname(case.file), paste0(c(emmtypes, '_typed_obs.Rdata'), collapse='')), 'respectively.\n')
 }
 
+
+ranScanCreateObservationMatrices.delay<-ranScanCreateObservationMatrices_
+
+ranScanCreateObservationMatrices.prospective<-function(case.file, emmtypes, n.weeks){
+  #' This is a simplified version of `ranScanCreateObservationMatrices.delay` that
+  #' create a sparse observation matrix only for the last (current) week.
+  #' This function rearranges the observation of `case.file` into observation Matrices
+  #' similarly to `ranScanCreateObservationMatrices` with the difference that it counts the cases that are not typed at "SAMPLE_DT" but only are at "RECEIPT_DT" datetimes.
+  #' It creates and saves in two `.Rdata` files:
+  #'  1) a matrix that contains the observations of untyped case.
+  #'  2) a list of matrices that contain the observations of the typed cases (one, for each emm type).
+  #'  
+  #' The matrices are spaved in sparse format requiring `library(Matrix)`.
+  #'  
+  #' @param case.file A string
+  #' @param emmtypes An vector of emmtypes.
+  #' @param n.weeks no. columns
+  #' @examples
+  #' ranScanCreateObservationMatrices.prospective(case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx", c('1.0', '12.0'), 100)
+  library(Matrix)
+  # emmtype is an vector of strings, e.g., 
+  case.df<-tryCatch({
+    load(paste0(case.file, ".Rdata"))
+    case.df
+  },
+  error = function(e){
+    case.df = ranScanInit(case.file)
+    return(case.df)
+  }
+  )
+  postcodes = unique(case.df$`Patient Postcode`)
+  n.postcodes= length(postcodes)
+  n.emmtypes = length(emmtypes)
+  MAX = max(c(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)], case.df$RECEPT_DT_numeric[!is.na(case.df$RECEPT_DT_numeric)]))
+
+  dimnames = list(postcodes, c(as.character( (week - n.weeks+1):(week) ) ))
+  observation.matrix.untyped = as(matrix(data=0,
+                                         nrow=n.postcodes,
+                                         ncol=n.weeks, 
+                                         dimnames=dimnames), "sparseMatrix")
+  ### continua da qui
+  observation.matrices.typed = list()
+  for (emmtype in emmtypes){
+    dimnames = list(postcodes, c(as.character( (week-n.weeks+1):(week) ) ))
+    observation.matrices.typed[[emmtype]] = as(matrix(data=0,
+                                                      nrow=n.postcodes,
+                                                      ncol=n.weeks,
+                                                      dimnames=dimnames), "sparseMatrix")
+  }
+  week = ???
+  # this is the week at week the scores are calculated
+  # fill the untyped observation.matrix with the cases that were detected by week "week"
+  # (SAMPLE_DT<week) but whose typing occurred after the same "week" (RECEIPT_DT>weel)
+  idx = (case.df$SAMPLE_DT_numeric > week - n.weeks + 1) &
+      (case.df$SAMPLE_DT_numeric <= week) &
+      (case.df$RECEPT_DT_numeric > week)
+  if (any(idx)){
+      case.df.idx = case.df[idx,]
+      for (i in 1:nrow(case.df.idx)){
+        postcode = case.df.idx[i, 'Patient Postcode']
+        week_ = case.df.idx[i, 'SAMPLE_DT_numeric']
+        observation.matrix.untyped[postcode, as.character(week_)] = 
+          observation.matrices.untyped[postcode, as.character(week_)] + 1
+      }
+  }
+    
+  for (emmtype in emmtypes){
+      # fill the typed observation.matrix with the cases that were detected and typed by week "week"
+      # (RECEIPT_DT<week)
+      idx = (case.df$emmtype == emmtype) &
+        (case.df$SAMPLE_DT_numeric > week - n.weeks + 1) &
+        (case.df$RECEPT_DT_numeric <= week) &
+        (case.df$SAMPLE_DT_numeric <= week)
+      if (any(idx)){
+        case.df.idx = case.df[idx,]
+        for (i in 1:nrow(case.df.idx)){
+          postcode = case.df.idx[i, 'Patient Postcode']
+          week_ = case.df.idx[i, 'SAMPLE_DT_numeric']
+          if (is.na(week_)){
+            week_ = 'NA'
+          }
+          observation.matrices.typed[[emmtype]][postcode, as.character(week_)] = 
+            observation.matrices.typed[[emmtype]][postcode, as.character(week_)] + 1
+        }
+      }
+  }
+  attribute_list = list(n.weeks = n.weeks, week.max = MAX)
+  attributes(observation.matrix.untyped) <- attribute_list
+  attribute_list = list(n.weeks = n.weeks, week.max = MAX)
+  attributes(observation.matrices.typed) <- attribute_list
+  
+  save.and.tell("observation.matrix.untyped",
+                file=file.path(dirname(case.file), paste0('untyped_prospective', '_obs.Rdata')))
+  save.and.tell("observation.matrices.typed",
+                file=file.path(dirname(case.file),paste0(c(emmtypes, '_typed_prospective_obs.Rdata'), collapse='')))
+}
+
+
 ranScanPostcodeMap<-function(observation.matrix, postcode.file.name=postcode.file){
   # Create a dataframe that maps postcodes to coordinates
-  cat("Compiling the table that maps the postcodes to geo-coordinates and population.\n")
+  writeLines("Compiling the table that maps the rows of the observation matrix to geo-coordinates and population.")
   source("utils.R")
-  
   ret<-tryCatch({
-    load("Data/postcode2coord.Rdata______")
-    writeLines("Using data loaded from `Data/postcode2coord.Rdata`")
-    postcode2coord
+    load("Data/postcode2coord.Rdata", verbose = 1)
+    if (all(as.character(postcode2coord$`Patient Postcode`) == rownames(observation.matrix))){
+      writeLines("Using data loaded from `Data/postcode2coord.Rdata`")
+      postcode2coord
+    }else{
+      writeLines("Data loaded from `Data/postcode2coord.Rdata` is for a different matrix and will be overwritten by the map for the current matrix.")
+      stop() #raise error
+    }
   },
   error = function(e){
     postcode2coord = data.frame("Patient Postcode" = rownames(observation.matrix))
@@ -269,7 +371,7 @@ ranScanPostcodeMap<-function(observation.matrix, postcode.file.name=postcode.fil
                                                  function(x){gsub(" ", "", toupper(x),  fixed = TRUE)}))
     postcode2coord[,c("latitude", "longitude", "Total")] = t(apply(postcode2coord, 1,
                                                                    postcode.to.location.and.population, postcode.data))
-    save.and.tell('postcode2coord', file="Data/postcode2coord.Rdata______")
+    save.and.tell('postcode2coord', file="Data/postcode2coord.Rdata")
     return(postcode2coord)
   }
   )
@@ -294,12 +396,12 @@ ranScanTimeFactor<-function(case.file, parameters=NULL){
   error = function(e){
     cat("Computing the temporal baseline.\n")
     source("time_utils.R")
-    Parameters = cmle(case.df$RECEPT_DT_numeric, 50, parameters)
+    Parameters = cmle(case.df$SAMPLE_DT_numeric, 50, parameters)
     n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
     x = 0:n.weeks
     prediction.cmle = predict.cmle(x, Parameters)
     
-    na = sum(is.na(case.df$RECEPT_DT_numeric))
+    na = sum(is.na(case.df$SAMPLE_DT_numeric))
     
     time.factor = c(na, prediction.cmle)
     names(time.factor) = c('NA', x)
@@ -384,7 +486,7 @@ ranScanEmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
 
 ranScanCreateBaselineMatrix<-function(case.file){
   
-  # emmtype is an array of strings, e.g., 
+  # emmtype is an vector of strings, e.g., 
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
     case.df
@@ -399,12 +501,12 @@ ranScanCreateBaselineMatrix<-function(case.file){
   n.postcodes= length(postcodes)
   n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
   
-  baseline.matrix = array(data=0,
+  baseline.matrix = as(matrix(data=0,
                           dim = c(n.postcodes, n.weeks + 2),
-                          dimnames=list(postcodes, c('NA', as.character(0:n.weeks))))
+                          dimnames=list(postcodes, c('NA', as.character(0:n.weeks)))), "sparseMatrix")
   
   time.factor = ranScanTimeFactor(case.file)
-  spatial.factor = ranScanPostcodeMap(array(data=0,
+  spatial.factor = ranScanPostcodeMap(matrix(data=0,
                                          dim = c(n.postcodes, n.weeks + 2),
                                          dimnames=list(postcodes, c('NA', as.character(0:n.weeks)) )))$Total
 

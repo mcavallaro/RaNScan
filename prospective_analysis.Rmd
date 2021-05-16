@@ -23,7 +23,7 @@ baseline.matrix = ranScanCreateBaselineMatrix(case.file)
 ```
 
 ```{r}
-emmtype.factor = ranScanEmmtypeFactor.tau(case.file,emmtype)
+emmtype.factor = ranScanEmmtypeFactor.tau(case.file, emmtype)
 ```
 
 ```{r}
