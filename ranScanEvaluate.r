@@ -131,15 +131,18 @@ ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix
   cylinders = rcylinder2(n.cylinders, observation.matrix.typed+observation.matrix.untyped, week.range, radia_and_heights, coord.km.df)
   if (NROW(cylinders) > 0){
     cylinders[,c('n_obs.typ', 'mu.typ', 'p.val.typ')] = t(apply(cylinders, 1, compute,
-                                                                      observation.matrix.typed, baseline.matrix.typed,
-                                                                      coord.km.df))
+                                                                observation.matrix.typed,
+                                                                baseline.matrix.typed,
+                                                                coord.km.df))
     cylinders[,c('n_obs.untyp', 'mu.untyp', 'p.val.untyp')] = t(apply(cylinders, 1, compute,
-                                                                      observation.matrix.untyped, baseline.matrix.untyped, coord.km.df))
-    
+                                                                      observation.matrix.untyped,
+                                                                      baseline.matrix.untyped,
+                                                                      coord.km.df))
     ## da vettorizzare:
     # cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < p.val.threshold) & (x['n_obs'] > 0), TRUE, FALSE)})
     # vettorizzato:
-    cylinders$warning = (cylinders['p.val.typ'] < p.val.threshold) | (cylinders['p.val.untyp'] < p.val.threshold)
+    cylinders$warning = (cylinders$p.val.typ < p.val.threshold) | (cylinders$p.val.untyp < p.val.threshold)
+    
   }else{
     cat("No cases in the selected week range. No cylinder list returned.\n")
   }

@@ -166,10 +166,10 @@ for (week in weeks){
   # colnames(obs.matrix.typed) = colnames(bsl.matrix.typed)
   # colnames(obs.matrix.untyped) = colnames(bsl.matrix.typed)
 
-   cylinders = ranScanCreateCylinders.delay(obs.matrix.typed, bsl.matrix.typed,
+  cylinders = ranScanCreateCylinders.delay(obs.matrix.typed, bsl.matrix.typed,
                                             obs.matrix.untyped, bsl.matrix.untyped, emmtype, week.range,
                                             n_cyl, postcode2coord, size_factor = sizefactor)
-  #
+  
   case.df.tmp = ranScanEvaluate(case.file, cylinders, emmtype, p.val.threshold=0.05)
   ws = case.df.tmp[case.df.tmp$emmtype == emmtype,]$warning.score
   i = as.integer(week) - as.integer(weeks[1]) + 1
