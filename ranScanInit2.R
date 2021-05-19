@@ -7,7 +7,9 @@ case.file="Data/Full MOLIS dataset minus PII 20200918.xlsx"
 ranScanInit<-function(case.file){ #}, postcode.file=default.postcode.file){
     source("utils.R")
     case.df = read_excel(case.file)
+    
     case.df = as.data.frame(case.df)
+    
     nomi = c("FULLNO", "Patient Postcode", "SAMPLE_DT", "RECEPT_DT", "Isolation Site Decoded", "Sterile Site Y N",
              "emm gene type")
     case.df = case.df[, nomi]
@@ -17,8 +19,10 @@ ranScanInit<-function(case.file){ #}, postcode.file=default.postcode.file){
 
     idx = case.df$`Sterile Site Y N` == "#s"
     idx2 = !is.na(case.df$`Sterile Site Y N`)
-    case.df = case.df[idx & idx2, ]
-    
+    if (any(idx & idx2)){
+      case.df = case.df[idx & idx2, ]      
+    }
+
     # Insert coordinates
     # if(!is.null(postcode.file)){
     #   postcode.data = read.csv(postcode.file, stringsAsFactors = F, header = T)
@@ -30,41 +34,55 @@ ranScanInit<-function(case.file){ #}, postcode.file=default.postcode.file){
     # convert dates to integers
     case.df$RECEPT_DT_numeric = as.integer(difftime(case.df$RECEPT_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "weeks"))
     case.df$SAMPLE_DT_numeric = as.integer(difftime(case.df$SAMPLE_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "weeks"))
-  
+    
     # clean data  
-    idx = (case.df$SAMPLE_DT_numeric >= 0) & (!is.na(case.df$SAMPLE_DT_numeric)) & (case.df$RECEPT_DT_numeric >= 0)
-    case.df<-case.df[idx,]
+    idx = (!is.na(case.df$SAMPLE_DT_numeric)) & (!is.na(case.df$RECEPT_DT_numeric))
+    if (any(idx)){
+      case.df = case.df[idx,]      
+    }
+
+    idx = (case.df$SAMPLE_DT_numeric >= 0) & (case.df$RECEPT_DT_numeric >= 0)
+    if (any(idx)){
+      case.df = case.df[idx,]      
+    }
     
     idx = case.df$SAMPLE_DT_numeric < case.df$RECEPT_DT_numeric
-    case.df = case.df[idx,]
+    if (any(idx)){
+      case.df = case.df[idx,]
+    }
+
     
     idx = is.na(case.df$emmtype)
-    case.df$emmtype[idx] = 'NA'
-    
+    case.df$emmtype[idx] = 'NA'      
+
     idx = is.na(case.df$`Patient Postcode`)
-    case.df$`Patient Postcode`[idx] = 'NA'
-    
+    case.df$`Patient Postcode`[idx] = 'NA'      
+
     case.df$lag = case.df$SAMPLE_DT_numeric - case.df$RECEPT_DT_numeric
     
     case.df$is.england = apply(case.df, 1, postcode.in.england)
     
     idx = is.na(case.df$is.england)
-    case.df[idx,]$`Patient Postcode`= "NA"
-    
-    case.df[idx,]$is.england = TRUE
+    if (any(idx)){
+      case.df[idx,]$`Patient Postcode`= "NA"
+      case.df[idx,]$is.england = TRUE
+    }
     
     case.df = case.df[case.df$is.england, ]
-    
-    case.df$is.england =NULL
+    case.df$is.england = NULL
     
     mm=mean(case.df$lag)
     sdt=sd(case.df$lag)
+
     idx = abs(case.df$lag) < mm + 3 * sdt
-    case.df = case.df[idx,]
-    
-    attribute_list = list(emmtypes=unique(case.df$emmtype))
+    if(any(idx)){
+      case.df = case.df[idx,]      
+    }
+
+    attribute_list = attributes(case.df)
+    attribute_list$emmtypes = unique(case.df$emmtype)
     attributes(case.df) <- attribute_list
-    
+
     save.and.tell("case.df", file=paste0(case.file,".Rdata"))
     return(case.df)
     #list(case.df=case.df, emmtypes=unique(case.df$emmtype)))
@@ -79,6 +97,7 @@ ranScanClean<-function(pattern){
 
 ranScanCreateObservationMatrices<-function(case.file, emmtypes){
   # emmtype is an vector of strings, e.g., 
+  library(Matrix)
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
     case.df
@@ -99,8 +118,9 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes){
     idx = case.df$emmtype == emmtype
     case.df.idx = case.df[idx,]
     observation.matrix = as(matrix(data=0,
-                             dim = c(n.postcodes, n.weeks + 2),
-                             dimnames=list(postcodes, c('NA', as.character(0:n.weeks)) )), "sparseMatrix")
+                                   nrow=n.postcodes,
+                                   ncol=n.weeks + 2,
+                                   dimnames=list(postcodes, c('NA', as.character(0:n.weeks)) )), "sparseMatrix")
     # the dimensions correspond to postcode, emmtype, time  
     for (i in 1:nrow(case.df.idx)){
 #      emmtype = case.df[i,'emmtype']
@@ -461,7 +481,6 @@ ranScanEmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
   # n.weeks=MAX-MIN+1
   # tmp = vector(mode = 'numeric', length=n.weeks)
   tmp = rep(0, n.weeks)
-  tmp2 = rep(0, n.weeks)
   # len = NROW(case.df)
   # case.df = case.df[case.df$SAMPLE_DT_numeric <= case.df$RECEPT_DT_numeric,]
   for(w in starting.week:MAX){
@@ -469,11 +488,10 @@ ranScanEmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
       week = w - n.weeks + i
       idx1 = case.df$SAMPLE_DT_numeric == week
       idx2 = case.df$RECEPT_DT_numeric > w
-      tmp[i] = tmp[i] + sum(idx1 & idx2) 
-      tmp2[i] = tmp2[i] + sum(idx1)
+      tmp[i] = tmp[i] + sum(idx1 & idx2) / sum(idx1)
     }
   }
-  tmp = tmp / tmp2 # (MAX - starting.week + 1)
+  tmp = tmp / len(starting.week:MAX) # (MAX - starting.week + 1)
   # cum.tmp = cumsum(tmp) / 1:length(tmp)
   # for (i in 1:n.weeks){
   #   if (is.na(cum.tmp[i])){
@@ -501,21 +519,22 @@ ranScanCreateBaselineMatrix<-function(case.file){
   n.postcodes= length(postcodes)
   n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
   
-  baseline.matrix = as(matrix(data=0,
-                          dim = c(n.postcodes, n.weeks + 2),
-                          dimnames=list(postcodes, c('NA', as.character(0:n.weeks)))), "sparseMatrix")
-  
+  baseline.matrix = matrix(data=0,
+                              nrow = n.postcodes,
+                              ncol = n.weeks + 2,
+                              dimnames=list(postcodes, c('NA', as.character(0:n.weeks))))
+
   time.factor = ranScanTimeFactor(case.file)
   spatial.factor = ranScanPostcodeMap(matrix(data=0,
-                                         dim = c(n.postcodes, n.weeks + 2),
-                                         dimnames=list(postcodes, c('NA', as.character(0:n.weeks)) )))$Total
-
+                                             nrow = n.postcodes,
+                                             ncol = n.weeks + 2,
+                                             dimnames=list(postcodes, c('NA', as.character(0:n.weeks)) )))$Total
   for(i in 1:nrow(baseline.matrix)){
     for(j in 1:ncol(baseline.matrix)){
         baseline.matrix[i,j] = time.factor[j] * spatial.factor[i]
     }
   }
-  baseline.matrix = baseline.matrix / sum(spatial.factor, na.rm = T)
+  baseline.matrix = as(baseline.matrix / sum(spatial.factor, na.rm = T), "sparseMatrix")
   save.and.tell("baseline.matrix", file=paste0(case.file, "_bas.Rdata"))
   return(baseline.matrix)
 }

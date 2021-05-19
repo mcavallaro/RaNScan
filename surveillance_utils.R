@@ -123,7 +123,7 @@ compute<-function(cylinder, observation.matrix, baseline.matrix, postcode.locati
   
   #  ci = qpois(c(0.25, 0.95) , lambda=mu)
   p.val = ppois(n_cases_in_cylinder-1, lambda=mu, lower.tail=FALSE)
-  return (c(n_cases_in_cylinder, mu, 0,0, p.val))
+  return (c(n_cases_in_cylinder, mu, p.val))
 }
 
 warning_ratio<-function(i, observation.matrix, cylinders, postcode.locations){

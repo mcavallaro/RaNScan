@@ -55,7 +55,7 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
   # weeks = weeks[seq(1, length(weeks), 20)]
   # cylinders0 = data.frame(x=double(), y=double(), rho=double(), t.low=integer(), t.upp=integer(), n_obs=integer(), mu=double(), lower=integer(), upper=integer(), p.val=double(), warning=logical())
   radia_and_heights = f_radia_and_heights(baseline.matrix, 1:24) * size_factor
-  cat("Evaluating exceedances from ",
+  cat("Evaluating cylinder exceedances from ",
         as.character(week2Date(week.range[1])),   # this interactive output doesnt work in the prospective mode
         " to ",
         as.character(week2Date(week.range[2])),        
@@ -64,18 +64,90 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
   # generate cylinders
   cylinders = rcylinder2(n.cylinders, observation.matrix, week.range, radia_and_heights, coord.km.df)
   if (NROW(cylinders) > 0){
-    cylinders[,c('n_obs', 'mu', 'lower', 'upper', 'p.val')] = t(apply(cylinders, 1, compute,
+    cylinders[,c('n_obs', 'mu', 'p.val')] = t(apply(cylinders, 1, compute,
                                                     observation.matrix, baseline.matrix, coord.km.df))
     ## da vettorizzare:
     # cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < p.val.threshold) & (x['n_obs'] > 0), TRUE, FALSE)})
     # vettorizzato:
     cylinders$warning = cylinders['p.val'] < p.val.threshold
   }else{
+    cat("No cases in the selected week range.\n")
+  }
+  print(Sys.time() - init)
+  return(cylinders)
+}
+
+ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix.typed,
+                                 observation.matrix.untyped, baseline.matrix.untyped,
+                                 emmtype,
+                                 week.range, n.cylinders=1000, rs=0.1,
+                                 p.val.threshold=0.05, plot=F, coord.df=postcode2coord,  size_factor=1){
+  # n.cylinders=10000 takes around 3 hours for the whole dataset, to end up with 300 non-empty cylinders
+  # observation.matrix  and baseline.matrix have dimension 
+  # This function scans the matrices
+  # -1 in observation.matrix index means that we are excluding from week NA
+  #' @param emmtype
+  #' @param week.range
+  #' @param n.cylinders (integer) number of proposed cylinders per week interval.
+  #' @param rs
+  #' @param p.val.threshold
+  #' @param plot (boolean)
+  observation.matrix.typed= observation.matrix.typed[!(rownames(observation.matrix.typed) == 'NA'),]
+  baseline.matrix.typed = baseline.matrix.typed[!(rownames(baseline.matrix.typed) == 'NA'),]
+  observation.matrix.untyped = observation.matrix.untyped[!(rownames(observation.matrix.untyped) == 'NA'),]
+  baseline.matrix.untyped = baseline.matrix.untyped[!(rownames(baseline.matrix.untyped) == 'NA'),]
+  
+  week.range = range(as.integer(week.range))
+  
+  c1 = sum(baseline.matrix.typed) > 2 * sum(observation.matrix.typed)
+  c2 = sum(baseline.matrix.untyped) > 2 * sum(observation.matrix.untyped)
+  if (c1 | c2){
+    warning("Warning: the baseline is too high. Have you multiplied for the emmtype factor? e.g., `ranScanCreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['12.0']], '12.0', starting.week, n.cylinders=100, rs=0.1)`")
+  }
+  init=Sys.time()
+  coord.df = coord.df[!is.na(coord.df$latitude),]
+  coord.km.df = coord.df
+  coord.km.df[,2:3] = vlatlong2km(coord.df[,2:3])
+  if ((week.range[1] < min(as.integer(colnames(observation.matrix.typed)))) | (week.range[2] > max(as.integer(colnames(observation.matrix.typed))))){
+    # line = sprintf("Try with `starting.week` < %d", ncol(observation.matrix)-2)
+    # writeLines(c("`starting.week` is bigger than the matrix length.", line))
+    A = sprintf("%d-%d", week.range[1], week.range[2])
+    B = range(as.integer(colnames(observation.matrix.typed)))
+    B = sprintf("%d-%d", B[1], B[2])
+    writeLines(paste0("Error: `week.range`` is ", A, ", while the range of `observation.matrix` is ", B, "." ))
+    return(NA)
+  }
+  # weeks = as.integer(colnames(observation.matrix)[-seq(1:(starting.week+2))])
+  # weeks = weeks[seq(1, length(weeks), 20)]
+  # cylinders0 = data.frame(x=double(), y=double(), rho=double(), t.low=integer(), t.upp=integer(), n_obs=integer(), mu=double(), lower=integer(), upper=integer(), p.val=double(), warning=logical())
+  radia_and_heights = f_radia_and_heights(baseline.matrix.typed, 1:24) * size_factor
+  cat("Evaluating cylinder exceedances from ",
+      as.character(week2Date(week.range[1])),   # this interactive output doesnt work in the prospective mode
+      " to ",
+      as.character(week2Date(week.range[2])),        
+      " for emm type ", emmtype, ".\n")
+  
+  # generate cylinders
+  cylinders = rcylinder2(n.cylinders, observation.matrix.typed+observation.matrix.untyped, week.range, radia_and_heights, coord.km.df)
+  if (NROW(cylinders) > 0){
+    cylinders[,c('n_obs.typ', 'mu.typ', 'p.val.typ')] = t(apply(cylinders, 1, compute,
+                                                                      observation.matrix.typed, baseline.matrix.typed,
+                                                                      coord.km.df))
+    cylinders[,c('n_obs.untyp', 'mu.untyp', 'p.val.untyp')] = t(apply(cylinders, 1, compute,
+                                                                      observation.matrix.untyped, baseline.matrix.untyped, coord.km.df))
+    
+    ## da vettorizzare:
+    # cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < p.val.threshold) & (x['n_obs'] > 0), TRUE, FALSE)})
+    # vettorizzato:
+    cylinders$warning = (cylinders['p.val.typ'] < p.val.threshold) | (cylinders['p.val.untyp'] < p.val.threshold)
+  }else{
     cat("No cases in the selected week range. No cylinder list returned.\n")
   }
   print(Sys.time() - init)
   return(cylinders)
 }
+
+
 
 # 
 # if (plot){

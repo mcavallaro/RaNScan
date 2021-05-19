@@ -11,7 +11,7 @@ case.df = ranScanInit(case.file)
 
 
 ```{r}
-emmtype='12.0'
+emmtype='44.0' ##44.0 #1.0 #33.0
 n.weeks = 150
 starting.week = 80
 ranScanCreateObservationMatrices_(case.file, emmtype, starting.week = starting.week, n.weeks = n.weeks)
@@ -37,6 +37,9 @@ print(Sys.time()-init)
 
 ```{r}
 time.factor = ranScanTimeFactor(case.file)
+```
+
+```{r}
 baseline.matrix = ranScanCreateBaselineMatrix(case.file)
 ```
 
@@ -46,16 +49,18 @@ delay.factor = ranScanEmmtypeFactor.delay_(case.file, starting.week = starting.w
 ```
 
 ```{r}
-for (t in c('150', '160')){
+for (t in as.character(seq(150,290, 15))){
   cols = colnames(observation.matrices.untyped[[t]])
   emt.factor = emmtype.factor[[emmtype]][cols]
   dly.factor = delay.factor
   
   bsl.matrix.typed = baseline.matrix[,cols] * rep((1 - dly.factor) * emt.factor,
-                                                      rep(NROW(baseline.matrix[,cols]), NCOL(baseline.matrix[,cols])))
+                                                      rep(NROW(baseline.matrix[,cols]),
+                                                          NCOL(baseline.matrix[,cols])))
   
   bsl.matrix.untyped = baseline.matrix[,cols] * rep(dly.factor,
-                                                      rep(NROW(baseline.matrix[,cols]), NCOL(baseline.matrix[,cols])))
+                                                      rep(NROW(baseline.matrix[,cols]),
+                                                          NCOL(baseline.matrix[,cols])))
   x = as.integer(colnames(observation.matrices.typed[[emmtype]][[t]]))
   y = colSums(observation.matrices.typed[[emmtype]][[t]])
   y1 = colSums(observation.matrices.untyped[[t]])
@@ -69,17 +74,66 @@ for (t in c('150', '160')){
   lines(x, colSums(bsl.matrix.typed[idx,]), col='red')
   lines(x, colSums(bsl.matrix.untyped[idx,]))
   legend('topleft', legend=c(sprintf('emm %s observations', emmtype), 'untyped observations', sprintf('emm %s baseline',emmtype), 'untyped baseline'), pch=c(20, 1, NA, NA), col=c('red','black','red','black'), lty = c(NA,NA,1,1))
+  
+  cat(t, "total bsl", sum(bsl.matrix.typed[-2,]) + sum(bsl.matrix.untyped[-2,]), '\n')
+  cat(t, "total observed cases", sum(y, na.rm = T) + sum( y1, na.rm = T), '\n')
 }
 ```
 
-
+# model for delay
 ```{r}
+L=len(dly.factor)
+y = dly.factor[(L-10):L]
+geo<-function(r){r**(10:0)}
+rmsd = function(x,y){  return( sqrt( mean((x-y)**2))) }
+rest = optimize(function(x){  rmsd(geo(x), y)}, c(0, 1) )$minimum
+plot(-10:0, y, ylab = 'Fraction of untyped cases', xlab = 'time elapsed from detection date [week]', xaxt='n', col='#1f77b4', xlim = c(-6,0))
+axis(1, at = -10:0, labels=-(-10:0))
+#lines(10:0, geo(rest))
+leng=100
+rest_ = vector(mode = "numeric", length = leng)
+for (i in 1:leng){
+   idx = sample(1:11, replace = T)
+   rest_[i] = optimize(function(x){  rmsd(  geo(x)[idx],  y[idx])}, c(0, 1) )$minimum
+}
+#rest_ = quantile(rest_, c(0.025, 0.5,0.975))
+rest_ = quantile(rest_, c(0.158, 0.5,0.6827+0.158))
+print(rest_)
+#lines(-10:0, geo(rest_[1]), col='#1f77b4')
+points(-10:0, geo(rest_[2]), col='#ff7f0e', pch=19)
+lines(-10:0, geo(rest_[2]), col='#ff7f0e', lty=2)
+#lines(-10:0, geo(rest_[3]), col='red')
+ylow=geo(rest_[1])
+yupp=geo(rest_[3])
+x = -10:0
+for (i in 1:length(x)){
+  segments(x0 =x[i], y0 = ylow[i], x1 = x[i], y1 = yupp[i], col='#ff7f0e' )
+  print(c(x[i], yupp[i]))
+}
+points(-10:0, y, ylab = 'Fraction of untyped cases', xlab = 'time elapsed from detection date [week]', xaxt='n', col='#1f77b4', xlim = c(-6,0))
+legend('topleft',legend = c('data', 'fit'), col = c('#1f77b4','#ff7f0e'), lty = c(NA, 2), pch=c(1,19))
+```
+```{r}
+# tab:blue : #1f77b4
+# tab:orange : #ff7f0e
+# tab:green : #2ca02c
+# tab:red : #d62728
+# tab:purple : #9467bd
+# tab:brown : #8c564b
+# tab:pink : #e377c2
+# tab:gray : #7f7f7f
+# tab:olive : #bcbd22
+# tab:cyan : #17becf
+```
+
+
+```{r include=FALSE}
 source("ranScanEvaluate.r")
 ```
 
-```{r}
+```{r include=FALSE}
 sizefactor = 1.2
-n_cyl = 5000
+n_cyl = 50000
 weeks = attributes(observation.matrices.untyped)$names
 n.rows = sum(case.df$emmtype == emmtype)
 n.cols = len(weeks)
@@ -96,8 +150,8 @@ for (week in weeks){
   
   obs.matrix.untyped = observation.matrices.untyped[[week]]
   obs.matrix.typed = observation.matrices.typed[[emmtype]][[week]]
-  obs.matrix = obs.matrix.untyped + obs.matrix.typed
-  cols = colnames(obs.matrix)
+#  obs.matrix = obs.matrix.untyped + obs.matrix.typed
+  cols = colnames(obs.matrix.typed)
   emt.factor = emmtype.factor[[emmtype]][cols]
 
   # moltiplicazione columnwise
@@ -106,11 +160,16 @@ for (week in weeks){
   bsl.matrix.untyped = baseline.matrix[,cols] * rep( dly.factor,
                                                      rep(NROW(baseline.matrix[,cols]), NCOL(baseline.matrix[,cols]))) 
   #
-  bsl.matrix = bsl.matrix.typed + bsl.matrix.untyped
+#  bsl.matrix = bsl.matrix.typed + bsl.matrix.untyped
   week.range = range(as.integer(cols))
   #print(c(sum(obs.matrix[-2,]), sum(bsl.matrix[-2,])))
-   cylinders = ranScanCreateCylinders(obs.matrix, bsl.matrix, emmtype, week.range, n_cyl, postcode2coord, size_factor = sizefactor)
-  # 
+  # colnames(obs.matrix.typed) = colnames(bsl.matrix.typed)
+  # colnames(obs.matrix.untyped) = colnames(bsl.matrix.typed)
+
+   cylinders = ranScanCreateCylinders.delay(obs.matrix.typed, bsl.matrix.typed,
+                                            obs.matrix.untyped, bsl.matrix.untyped, emmtype, week.range,
+                                            n_cyl, postcode2coord, size_factor = sizefactor)
+  #
   case.df.tmp = ranScanEvaluate(case.file, cylinders, emmtype, p.val.threshold=0.05)
   ws = case.df.tmp[case.df.tmp$emmtype == emmtype,]$warning.score
   i = as.integer(week) - as.integer(weeks[1]) + 1
@@ -123,7 +182,7 @@ dataframe.to.export$warning.score = NULL
 ```
 
 ```{r}
-plot(range(weeks), c(0,1), col='white')
+plot(range(weeks), c(0,1), col='white', xlab = 'week', ylab='warning score')
 L = NCOL(dataframe.to.export)
 for (i in 1:2300){
   if( !is.na(dataframe.to.export[i,'x'])){
@@ -131,8 +190,36 @@ for (i in 1:2300){
   }
 }
 abline(h=0.95)
+
+write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '_with_delay_sf1.2.csv'))
 ```
 
 
+# comparison delay vs no-delay
 
+```{r}
+emmtype_44_0_with_delay_sf1_2 <- read.csv("emmtype_44.0_with_delay_sf1.2.csv")
+emmtype_44_0_sf1_2 <- read.csv("emmtype_44.0_sf1.2.csv")
+
+weeks = 150:293
+plot(range(weeks), c(0,1), col='white', xlab = 'week', ylab='warning score')
+for (i in 1:2300){
+  if( !is.na(emmtype_44_0_sf1_2[i,'x'])){
+    lines(weeks, unlist(emmtype_44_0_sf1_2[i,71:214]))
+  }
+}
+abline(h=0.95)
+
+
+weeks = 150:293
+plot(range(weeks), c(0,1), col='white', xlab = 'week', ylab='warning score')
+L = NCOL(emmtype_44_0_with_delay_sf1_2)
+for (i in 1:2300){
+  if( !is.na(dataframe.to.export[i,'x'])){
+    lines(weeks, unlist(emmtype_44_0_with_delay_sf1_2[i,17:L]))
+  }
+}
+lines(150:290, time.factor[150:290] / 40, col='red')
+abline(h=0.95)
+```
 

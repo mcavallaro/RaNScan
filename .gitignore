@@ -88,3 +88,4 @@ vignettes/*.pdf
 *.cas
 *.prm
 
+.Rproj.user
