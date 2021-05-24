@@ -1,0 +1,383 @@
+---
+title: "Data_for_Massimo"
+author: "Massimo Cavallaro"
+date: "30 June 2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+Data<-read.csv('Data_for_Massimo.csv')
+Data %>%  head
+```
+
+
+```{r}
+A=st_read("shape_files/PostalArea.shp")
+A %>% head
+plot(A)
+```
+
+```{r}
+plot(Y.loc ~ X.loc, Data, asp=1)
+Y.max<-max(Data$Y.loc) + 10000
+X.max<-max(Data$X.loc) + 10000
+Y.min<-min(Data$Y.loc) - 10000
+X.min<-min(Data$X.loc) - 10000
+abline(v=X.max)
+abline(v=X.min)
+abline(h=Y.max)
+abline(h=Y.min)
+```
+
+
+Find baseline by estimating $\mu_{ij}$ and $\sigma_{ij}$.
+
+```{r}
+s<-colMeans(Data[,5:50])
+q<-rowMeans(Data[,5:50])
+media<-mean(unlist(Data[,5:50]))
+mu<- (q %*% t(s)) / media
+# sigma_matrix<-matrix(data=NA, nrow = nrow(Data[,5:50]), ncol= ncol(Data[,5:50]))
+```
+
+
+```{r}
+png('trend.png')
+plot(c(0,46), range(Data[,5:50]), col='white')
+points(unlist(Data[1,5:50] ), col='red')
+points(unlist(Data[2,5:50] ), col='green')
+# points(unlist(Data[3,5:50] ))
+points(unlist(Data[4,5:50] ), col='blue')
+# points(unlist(Data[5,5:50] ))
+
+lines(mu[1,], col='red')
+lines(mu[2,], col='green')
+# lines(mu[3,])
+lines(mu[4,], col='blue')
+# lines(mu[5,])
+dev.off()
+```
+ 
+
+find fit neg. binom. parameter using MLE:
+```{r}
+mle<-function(data, mu, iterations=1000){
+  fn<-function(size){
+    if (size>0){
+      sum(-dnbinom(data, size=size, mu=mu, log=TRUE))
+    }else{
+     100000 
+    }
+  }
+  res<-optimize(fn, c(0,100000)              )
+  res$minimum
+  # res<-optimx(1,
+  #             fn,
+  #             method='Nelder-Mead',
+  #             control=list(maxit=iterations))
+  # if (res$convcode != 0){
+  #   cat("optimisation did not converge with code:", res$convergence, "\n")
+  # }
+  # res[,1]
+}
+# mle<-function(x){
+#   tryCatch({res=fitdistr(unlist(x), densfun="negative binomial"); return(c(res$estimate, res$sd))},
+#   error =function(e){c(NaN, NaN, NaN, NaN)})
+# }
+# Data[,"par_size"]<-t(apply(Data[,5:40], MARGIN = 1, mle))
+# # Data['par_p']=Data$size / (Data$size + Data$mu)
+# head(Data)
+size<-mle(unlist(Data[,5:50]), unlist(mu))
+size
+```
+
+```{r}
+png('variance_vs_mean.png')
+x=as.vector(unlist(mu))
+vec=seq(0,45,length.out=6)
+df=data.frame(x=x, value=as.vector(unlist(Data[,5:50])))
+df$cut=cut(df$value, breaks=100)
+A<-aggregate(x~cut, df, var)
+B<-aggregate(x~cut, df, mean)
+# head(df)
+plot(B$x, A$x, xlab = 'estimated mean (mu) of binned data', ylab='variance of binned data', xlim=c(0,45))
+x=seq(0,60)
+lines(x, x + x^2 / size)
+legend('topleft',c('sample variance', 'mu+mu^2 r'), pch=c(1,NA), lty=c(NA,1))
+dev.off()
+```
+
+<!-- One useful property of the negative binomial distribution is that the -->
+<!-- independent sum of negative binomial random variables, all with the same -->
+<!-- parameter p, also has a negative binomial distribution. Let $Y_i \sim NB(r_i, -->
+<!-- p)$, $i=1,2,\ldots$. Then the sum $X=\sum_i Y_i$ has a negative binomial -->
+<!-- distribution with parameters $\sum_i r_i$ and $p$. -->
+
+Draw the circles and simulate from a circles -- Simulate from sums of negative binomials
+
+```{r include=FALSE}
+library(truncnorm)
+random_portions<-function(n,  times, border=10000, rs=0.5, a=0, rt=2){
+  # n is the number of samples
+  # times
+  # border is the dinstance from the boundary
+  # rs is a reference size 
+  # rf is a reference time scale (to be learned)
+
+  # generate centers in a square:
+  x = runif(n, X.min + border, X.max - border)
+  y = runif(n, Y.min + border, Y.max - border)
+  
+  # generate centers close to the hospitals:
+  # x = sample(Data$X.loc, n, replace = T) + runif(n, -rs/10, rs/10)
+  # y = sample(Data$Y.loc, n, replace = T) + runif(n, -rs/10, rs/10)  
+  
+  # t = sample(1:times, n, replace=TRUE)
+  # dt = sapply(t, function(x){ min(times-x, x-1, sample(1:rt, 1))})
+  t.upp = rep(times,n)
+  
+  # the spatio-temporal portion are in the last 5 days only.
+  t.low = t.upp - sample(1:5, n, replace=T)
+
+      # generate radia
+  d_max =  apply(data.frame(x=x-X.min, y=y-Y.min, xs=X.max-x, ys=Y.max-y), 1, min) # this is min vertical distance from the border.
+  # print(d_max)
+  rho = rtruncnorm(n, mean=rs, sd=rs, a=a, b=d_max)
+  return (data.frame(x=x, y=y, rho=rho, t.low=t.low, t.upp=t.upp))
+}
+```
+```{r}
+portions = random_portions(50000, 46, rs=20000)
+```
+
+```{r}
+# pdf('surveillance_3D_files/cylinders_9_weeks.pdf')
+portions.to.plot = head(portions,30)
+time_intervals = apply(portions.to.plot, 1, function(x){(seq(x[4], x[5]))})
+time_layer = do.call(c, time_intervals)
+portions.to.plot$time_interval_length<-portions.to.plot$t.upp - portions.to.plot$t.low + 1
+#
+portions.to.plot = portions.to.plot[as.numeric(rep(row.names(portions.to.plot), portions.to.plot$time_interval_length)),]
+portions.to.plot$time_layer = time_layer
+
+par(mfrow=c(3, 3), mar=c(0.4, 0.4, 0.4, 0.4))
+for (i in min(portions.to.plot$time_layer):max(portions.to.plot$time_layer)){
+  plot(Y.loc ~ X.loc, Data, pch=20, asp=1, xaxt='n', yaxt='n')
+  # plot(baseline[[i]], main=paste('week ', as.character(i)), cols='#473B54', pch=16)
+  # plot.ppp(epidemics[[i]], cols='red', add=T, pch=16)
+  tmp_portion = portions.to.plot[portions.to.plot$time_layer== i,]
+  n_d = dim(tmp_portion)[1]
+  if (n_d > 0){
+    for (j in 1:n_d[1]){
+      plot.owin(disc(tmp_portion[j,3], c(tmp_portion[j,1], tmp_portion[j,2])), add=TRUE)
+    }
+  }
+}
+# dev.off()
+```
+
+We compute for each cylinder:
+  
+  * the number  `n_obs` of observed events within,
+  * 5% and 95% quantiles (`lower` and `upper`),
+  * the probability `p.val` of having `n_obs` (or more) events under the baseline model,
+  * the volume of the cylinder.
+
+
+```{r include=FALSE, cache=TRUE}
+is_in_circle<-function(Data, x, y, rho){
+  d = sqrt((as.numeric(Data['X.loc'])-x)^2 + (as.numeric(Data['Y.loc'])-y)^2 )
+  res<-ifelse(d<rho, 1, 0)
+  return(res)
+}
+```
+
+
+```{r}
+compute<-function(portion, Data){
+  # portion is a spatio-temporal portion
+
+  hospitals_in_circle<-apply(Data, 1, is_in_circle, as.numeric(portion['x']), as.numeric(portion['y']), as.numeric(portion['rho']))
+  n_hos<-sum(hospitals_in_circle)
+  time_steps = seq( as.numeric(portion['t.low']),  as.numeric(portion['t.upp']))
+  n_days=length(time_steps)
+  if (n_hos>0){
+    # compute the number of cases in the portion
+    counts = 0
+    for (t in (time_steps + 4)){ #add 5 because the first 4 columns of Data are not counts.
+      # count = sum(apply(Data[t], 1, hospital_is_in_circle, portion$x, portion$y, portion$rho))
+      counts = counts + sum(Data[,t] * hospitals_in_circle) 
+    }
+    # 
+    # # simulate from neg. binom for each time step and each hospital in circle.
+    # simcounts = apply(as.matrix(mu[as.logical(hospitals_in_circle), time_steps]), c(1,2),
+    #                             function(x){rnbinom(100, size=size, mu=x)})
+    # # sum over the time steps and the hospitals:
+    # simcounts = rowSums(simcounts)
+    # quantiles = quantile(simcounts, probs = c(0.85, 0.90, 0.95))
+    # 
+    
+    # with constant size the sum of NB is NB
+    mu=sum(as.matrix(mu[as.logical(hospitals_in_circle), time_steps]))
+    p.val = pnbinom(counts, size=size, mu=mu, lower.tail=FALSE)
+    # p.val_sim = 1-ecdf(simcounts)(counts)
+    return (c(n_hos, n_days, counts,  p.val))
+  }else{
+    return(c(n_hos, n_days, NA, NA))
+  }
+}
+portions[,c('n_hospitals', 'n_days', 'n_obs',  'p.val')] = t(apply(portions, 1, compute, Data))
+```
+
+
+Let's tag each cylinder with a `warning` flag:
+```{r}
+# portions$warning = apply(portions, 1, function(x){ifelse(((x[6] < x[7])|(x[6] > x[8])), TRUE, FALSE)})
+portions$warning = apply(portions, 1, function(x){ifelse(x['p.val'] < 0.05, TRUE, FALSE)})
+head(portions)
+portions2=portions[!is.na(portions$n_obs),]
+```
+
+```{r}
+#p.val_sim and p.val are consistent:
+#plot(portions2$'p.val', portions2$'p.val_sim')
+#let's stick to p.val then which is faster to compute.
+```
+
+```{r}
+# points(warning_centers$x, warning_centers$y, col='red', pch=20, cex=0.1)
+warnings=portions2[portions2$warning == TRUE, ]
+non_warnings=portions2[portions2$warning == FALSE, ]
+
+```
+
+
+
+Obviously in areas with many hospitals there are more circles, and thus more red circles.
+What we are interested in is the areas were the number of red circles is more that the 0.05.
+For each hospital, count how many circles are:
+
+```{r}
+contains_point<-function(Portion, x, y){
+  d = sqrt((as.numeric(Portion['x'])-x)^2 + (as.numeric(Portion['y'])-y)^2 )
+  res<-ifelse(d<as.numeric(Portion['rho']), 1, 0)
+  return(res)
+}
+# 
+
+count<-function(Data, portions, count_warnings=TRUE){
+  x=as.numeric(Data["X.loc"])
+  y=as.numeric(Data["Y.loc"])
+  if (count_warnings){
+      idx = portions$warning
+  }else{
+      idx = !portions$warning    
+  }
+  sum(apply(portions[idx,], 1, contains_point, x, y))
+}
+Data$n_red_circles = apply(Data, 1, count, portions2)
+Data$n_green_circles = apply(Data, 1, count, portions2, count_warnings=FALSE)
+Data$red_over_green = Data$n_red_circles / (Data$n_red_circles + Data$n_green_circles)
+Data$warning = Data$red_over_green > 0.05
+Data$warning2 = Data$red_over_green > 0.01
+```
+
+```{r}
+pdf('Outbreak_1Jul.pdf')
+plot(Y.loc ~ X.loc, Data, asp=1, col='white', xlab='longitude', ylab='latitude')
+
+for (j in seq(1:dim(non_warnings)[1])){
+      plot.owin(disc(non_warnings$rho[j], c(non_warnings$x[j],non_warnings$y[j])),  add=TRUE, border='#ece7f266')
+}
+for (j in seq(1:dim(warnings)[1])){
+      plot.owin(disc(warnings$rho[j], c(warnings$x[j],warnings$y[j])),  add=TRUE, border='#3182bd66')
+}
+points(Data$X.loc, Data$Y.loc, pch=20, cex=0.1)
+points(Data[Data$warning2,]$X.loc, Data[Data$warning2,]$Y.loc, pch=20, cex=1.0, col='orange')
+points(Data[Data$warning,]$X.loc, Data[Data$warning,]$Y.loc, pch=20, cex=1.2, col='red')
+dev.off()
+```
+
+
+
+```{r}
+Data2 = Data[,c('red_over_green', 'n_red_circles', 'n_green_circles', 'Code', 'Name')]
+names(Data2) = c("#warning/#circles", "#warnings", "#circles", "Code","Name" )
+Data2[order(Data2["#warning/#circles"], decreasing = TRUE), ]
+```
+
+```{r}
+write.table(Data2, file='Cov_Exceedance.csv', quote=FALSE, row.names = FALSE, sep=',')
+```
+
+The candidate cyliders will be used to estimate
+where the centre of the anomaly is by using a weigthed average.
+These cylinders can be either false or true positive,
+however, loosely speaking, false positive cylinders are evenly distributed and in average don't strongly influence the estimated outbreak center. 
+It is worth noting that, for the training set, it is possible to say if each cylinder actually contains red points.
+```{r include=FALSE}
+Epidemics = list()
+for (i in 1:length(temporal.trend)){
+  if (length(epidemics[[i]]$x) > 0 ){
+    Epidemics[[i]] = data.frame(x=epidemics[[i]]$x,  y=epidemics[[i]]$y, week=i);
+  }else{
+    Epidemics[[i]] = data.frame(x=NA, week=i, y=NA);
+  }
+}
+contains<-function(portion, Epidemics){
+  weeks = seq(portion[3]-portion[5], portion[3]+portion[5])
+  count = 0
+  for (week in weeks){
+      count = count + sum(apply(Epidemics[[week]], 1, is_in_circle, portion[1], portion[2], portion[4]), na.rm=TRUE)
+  }
+  return (count>0)
+}
+portions$true_warning = apply(portions, 1, contains, Epidemics)
+```
+
+#  Estimate of outbreak centroid
+
+We best estimate the outbreak center by averaging over the candidate outbreak
+events centers. Obviously, we need an weighed average, as the circles have
+different radia and convey different amount of information.
+
+```{r}
+anomalies = portions[portions$warning,]
+```
+
+```{r}
+midpoint = function(x){
+    mid.x = weighted.mean(x$x, 1/x$rho)
+    mid.y = weighted.mean(x$y, 1/x$rho)
+    mid.t = weighted.mean(x$t, 1/(x$dt+1))
+    estimate = c(mid.x, mid.y, mid.t)
+    names(estimate) = c('x0','y0','t0')
+    return(estimate)
+}
+anomaly.estimate = midpoint(anomalies)
+anomaly.estimate
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+i=5
+pdf('surveillance_3D_files/estimate_weeks.pdf')
+plot(baseline[[i]], main=paste('week ', as.character(i)))
+  plot.ppp(epidemics[[i]], cols='red', add=T)
+  tmp_portion = portions.to.plot[portions.to.plot$week_data == i,]
+  n_d = dim(tmp_portion)[1]
+  if (n_d > 0){
+    for (j in 1:n_d[1]){
+      plot.owin(disc(tmp_portion[j,4], c(tmp_portion[j,1],tmp_portion[j,2])), add=TRUE)
+      points(anomaly.estimate[1], anomaly.estimate[2], pch=4, cex=5, lwd=4, col='#FF3333')
+    }
+  }
+  dev.off()
+```
+
+
+

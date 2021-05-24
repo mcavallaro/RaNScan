@@ -2,6 +2,10 @@
 .Rhistory
 .Rapp.history
 
+# temporary git ignore
+*.Rdata
+
+
 # Session Data files
 .RData
 
@@ -48,3 +52,39 @@ vignettes/*.pdf
 *.gif
 *.pptx
 *.docx
+*.txt
+
+# ARCGIS files
+*.shp
+*.shx
+*.dbf
+*.fix
+*.prj
+*.qml
+*.qpj
+*.qix
+*.qix
+*.cpg
+*.sbn
+*.sbx
+
+# doc
+*.html
+*.xml
+*.ods
+*.csl
+*.lnk
+*.docm
+*.bib
+
+/HDR-UK_Webmapping_in_R-master/
+/HDR-UK_Webmapping_in_R-master
+/Manuscript/
+/Manuscript
+
+#statscan
+*.geo
+*.pop
+*.cas
+*.prm
+

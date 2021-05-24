@@ -1,0 +1,204 @@
+---
+title: "surveillance"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+library('NHPoisson')
+lambda = function(x){dnorm(x) + dnorm(x, m=1, sd=0.5) + dnorm(x, m=4, sd=0.1) * 0.1}
+rate = lambda(seq(-4,5,0.001))
+sim = simNHP.fun(rate)
+plot(rate, ylab='baseline', xlab = 'space/time')
+```
+
+Here is a dataset `events` that behaves according to the baseline
+```{r}
+events = sim$posNH
+plot(rate, col=NULL, xlab = 'space/time', ylab = '', yaxt='n')
+abline(v=events, col='#8080801A')
+```
+
+Let's test a property of the PP.
+Draw many random segments and measure the number of observations that fall into each segment using the function `true_counts`
+```{r}
+lengths = floor(rnorm(1000, m=100))
+A = sample(1:(length(rate)-200), length(lengths))
+B = A + lengths
+segments = data.frame(x0=A, x1=B, length=lengths)
+```
+
+```{r}
+true_counts <- function(x){
+  sum(findInterval(events, c(-10,x[1],x[2],10000))==2)
+}
+```
+
+```{r}
+segments$counts = apply(segments, 1, true_counts)
+```
+
+Monte Carlo step to find confidence intervals, uses the function `basal_CI`.
+```{r}
+basal_CI <- function(x){
+  Ns = replicate(500, length(simNHP.fun(rate[x[1]:x[2]])$posNH))
+  quantile(Ns, probs = c(0.05, 0.95))
+}
+```
+
+```{r}
+CI = data.frame(t(apply(segments, 1, basal_CI)))
+segments = cbind(segments, CI)
+```
+
+```{r}
+head(segments)
+```
+
+Now one can check aberrations (these will be false positives, as we are looking at the simulated dataset).
+We try with two criteria:
+```{r}
+is_worring<-function(x){
+  ifelse((x[4]<x[5]) | (x[4]>x[6]), T, F)
+}
+is_worring2<-function(x){
+  ifelse(x[4]>x[6], T, F)
+}
+```
+
+```{r}
+sum(apply(segments, 1, is_worring)) /  1000
+```
+consistent with the CI of 0.05-0.95.
+
+```{r}
+segments$warning = apply(segments, 1, is_worring)
+segments$warning2 = apply(segments, 1, is_worring2)
+#
+false_positive = segments[segments$warning == T, ]
+false_positive2 = segments[segments$warning2 == T, ]
+plot(rate, xlab='space/time', ylab = 'baseline')
+abline(v=events, col='#8080801A')
+abline(v=apply(false_positive,1,function(x)mean(x[1:2])), col='#9000FF3A')
+# abline(v=apply(false_positive2,1,function(x)mean(x[1:2])), col='#FF00003A')
+
+plot(density(apply(false_positive,1,function(x)mean(x[1:2]))), col='#9000FF', xlab='space/time', ylab = 'false positives', main='')
+# lines(density(apply(false_positive2,1,function(x)mean(x[1:2]))), col='#FF0000')
+```
+
+
+Let us test this now with the same base line and the addition of event (occurring around position 2000) not incorporated in the Poisson statistics baseline.
+
+
+```{r}
+# these are the baseline events
+plot(density(sim$posNH))
+
+#these are 50 epidemic events:
+epidemic = sample(1:length(rate),  50, replace=T, prob = dnorm(seq(-4,5,0.001), m=-2, sd=0.1))
+lines(density(epidemic), col='red')
+```
+
+
+All, together, they appear like that, so there is an abberration around x=2000.
+```{r}
+plot(density(sim$posNH), col='red')
+
+events = sort(c(sim$posNH, epidemic))
+# it is important to sort the events to use findInterval (must find a solution for the spatial case)
+
+
+lines(density(events))
+```
+
+Perform the same procedure as before to check the segments with aberrations.
+
+Draw many random segments and measure the numeber of observations that fall into each segment.
+```{r}
+
+
+lengths2 = floor(rnorm(1000, m=100))
+A2 = sample(1:(length(rate)-200), length(lengths2))
+B2 = A2 + lengths2
+segments2 = data.frame(x0=A, x1=B, length=lengths2)
+
+segments2$counts = apply(segments2, 1, true_counts)
+
+CI = data.frame(t(apply(segments2, 1, basal_CI)))
+segments2 = cbind(segments2, CI)
+
+print(sum(apply(segments2, 1, is_worring)) /  1000)
+#0.083
+```
+
+```{r}
+head(segments2)
+```
+
+
+select the entries in the data.frame that correspond to aberration.
+
+```{r}
+segments2$warning = apply(segments2, 1, is_worring)
+segments2$warning2 = apply(segments2, 1, is_worring2)
+segments_to_inspect = segments2[segments2$warning == T, ]
+segments_to_inspect2 = segments2[segments2$warning2 == T, ]
+```
+
+```{r}
+print(dim(segments_to_inspect))
+print(dim(segments_to_inspect2))
+```
+
+check where these segments are centred (red and violet vertical lines).
+The ways to check aberration (looking a the upper and lower exadance, are OK).
+```{r}
+plot(rate)
+abline(v=events, col='#8080801A')
+abline(v=apply(segments_to_inspect,1,function(x)mean(x[1:2])), col='#9000FF1A')
+abline(v=apply(segments_to_inspect2,1,function(x)mean(x[1:2])), col='#FF00003A')
+plot(density(apply(segments_to_inspect,1,function(x)mean(x[1:2]))), col='#9000FF1A')
+lines(density(apply(segments_to_inspect2,1,function(x)mean(x[1:2]))), col='#FF00003A')
+
+```
+In fact, there are some false positives, which is statistically correct (it is possible to do that better by using using  a confusion matrix).
+
+Also from the simulated dataset, we know the baseline! This clearly allows us to find where the aberration is!
+
+Also, obviously, the false positive spatial distribution depends on the baseline entry (thus making easy to spot true aberrations).
+```{r}
+plot(density(apply(segments_to_inspect,1,function(x)mean(x[1:2]))), col='#9000FF6A', xtitle='')
+abline(v=events, col='#8080800A')
+abline(v=apply(segments_to_inspect,1,function(x)mean(x[1:2])), col='#9000FF1A')
+abline(v=apply(false_positive,1,function(x)mean(x[1:2])), col='#FF00001A')
+#lines(density(apply(segments_to_inspect2,1,function(x)mean(x[1:2]))), col='#FF00003A')
+lines(density(apply(false_positive, 1, function(x)mean(x[1:2]))), col='#FF00006A')
+legend("topleft", c("warnings", "false positives"), col=c("#9000FF6A", "#FF00006A"), lty=c(1, 1))
+```
+
+To do: We expect that the segment overlap! Let's only consider the overlaps (as in sequece aligment!)
+
+# Differences between this and the model of StatScan.
+
+StatScan essentially implements the methods of Kulldorff, which detects aberrations
+based on a likelihood ratio test:
+$$
+r = \frac{Likel.(H_1)}{Likel.(H_0)}
+$$
+where the null model is that the rate of having a disease (per person in the population) is constant everywhere (therefore, only depends on the density, but can be conceptually extended to space-time(?))
+and the $H_1$ assumes that the rate is higher in some place (under the same model structure, e.g., Poisson, but with different parameter). $r$ the test statistics.
+
+
+My method has similar null model (the rate lambda $x$ just represents how the rate varies in the space-time), but makes no assumption about the model of $H_1$.
+
+The test statistics for my method is the actuall number of counts.
+An alternative test statistics is, e.g., the *average nearest neighbor*, see:
+https://mgimond.github.io/Spatial/hypothesis-testing.html#a-better-approach-a-monte-carlo-test
+
+
+

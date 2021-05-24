@@ -1,0 +1,571 @@
+---
+title: "iGAS Surveillance"
+author: "Massimo Cavallaro"
+date: "26 June 2020"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(sf)
+library(spatstat)
+library(optimx)
+library(magrittr) #Ctrl+Shift+M
+
+```
+
+
+Let us aggregate the data from all the emmtypes with only `thresh=1` reads each, these cannot be outbreaks and will be use to find the baseline.
+The baseline is important to see the spatial-temporal trend.
+
+Now, some emmtypes have higher occurrence than the emm-types even in the absence of outbreak.
+For these  we assume that the spatio-temoporal pattern is the same as the baseline and that  only changes in absolute terms. Therefore we also compute a conversion factor.
+
+```{r}
+freq<-data.frame(table(dat$emmtypes2))
+freq$Var1 = as.character(freq$Var1)
+# freq
+thresh<-50
+idx = freq$Freq <= thresh
+baseline<-freq[idx,1]
+num_baseline <- sum(idx)
+#
+freq<-freq[order(freq$Freq, decreasing=TRUE),]
+freq$cumsum<-cumsum(freq$Freq)
+freq<-freq[freq$Freq>thresh,]
+freq$conversion.factor<-sapply(freq$Freq, function(x){x/num_baseline} )
+freq
+```
+
+Insert coordinates
+```{r}
+A = read.csv("ukpostcodes.csv", stringsAsFactors = F)
+```
+
+```{r}
+postcode.to.location = function(x){
+  idx = A['postcode'] == x['Patient Postcode']
+  s = sum(idx)
+  if (is.na(s)){
+    res = c(NA, NA)
+  }
+  else if(s == 1){
+    res = unlist(A[idx, c("latitude", "longitude")])    
+  }else{
+    res = c(NA, NA)
+  }
+  return(res)
+}
+
+dat[,c("latitude", "longitude")] = t(apply(dat, 1, postcode.to.location))
+```
+
+
+```{r}
+idx = sample(1:dim(A)[1], 1000)
+plot(latitude ~ longitude, data=A[idx,], ylim=c(50,60), asp=1 )
+points(dat$longitude, dat$latitude, col = 'red')
+print(unique(dat$PHE_CENTRE_NAME))
+```
+
+```{r}
+head(A)
+```
+
+
+```{r}
+is.baseline<-function(x){
+  if (x %in% baseline){
+    return (TRUE)
+  }else{
+    return (FALSE)
+    }
+}
+dat$baseline<-sapply(dat$emmtypes2, is.baseline)
+
+```
+
+```{r}
+head(dat[,c("baseline","emmtypes","emmtypes2")])
+```
+
+```{r}
+sum(dat$baseline)
+length(dat$baseline) - sum(dat$baseline)
+
+```
+
+
+
+
+
+B = density(d,at='pixels')
+image(B$v)
+ 
+
+```{r}
+dat$RECEPT_DT_numeric = difftime(dat$RECEPT_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "days")
+
+dat$SAMPLE_DT_numeric = difftime(dat$SAMPLE_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "days")
+
+dat<-dat[dat$SAMPLE_DT_numeric > -1,]
+```
+
+
+Is there any seasonality?
+
+
+```{r}
+seasonality_all<-data.frame(table(dat$SAMPLE_DT_numeric))
+seasonality_all<-seasonality_all[order(seasonality_all$Var1),]
+seasonality_all$Var1 = as.numeric(as.character(seasonality_all$Var1))
+plot(seasonality_all$Var1,seasonality_all$Freq, type='l')
+```
+
+
+```{r}
+baseline<-dat[dat$baseline,]$SAMPLE_DT_numeric
+baseline<-baseline[!is.na(baseline)]
+seasonality_baseline<-data.frame(table(baseline))
+seasonality_baseline<-seasonality_baseline[order(seasonality_baseline$baseline),]
+seasonality_baseline$baseline = as.numeric(as.character(seasonality_baseline$baseline))
+# plot(seasonality_all$Var1,seasonality_all$Freq, type='l')
+plot(seasonality_baseline$baseline, seasonality_baseline$Freq, type='l', col='green')
+```
+
+Now the green line must correlate with with population density circle by circle.
+Also we should apply the scaling coefficients to find a baseline for each emmtype.
+
+
+
+The number of baseline events $N$ in a random cilinder given the baseline rate $\lambda(x,y,t)$ is a non-homogenous Poisson random variable $N\sim Poi(\sum_t \int_A d x d y \lambda(x,y,t))$  where t is the day index, A is the surface of the base circle,etc...
+Here we don't know the baseline.
+
+Using bootstrap, we can try find a confidence interval (5% and 95% quantiles) of $N$, and assess whether the non-baseline number of events falls into this interval.
+
+however, that is complicated, and we first rely on estimating $\lambda(x,y,t)$.
+
+We find that using maximum likelyhood for each postcode $x$, separately.
+We need:
+
+ * a columns that contain the population $N_x$ at a post code $x$.
+ * An estimate of the season dependent rate $\theta(t)$.
+ * Assume that the baseline is $\lambda(x,t)=N_x \theta(t)$
+ * a test that the baseline is Poisson.
+ 
+
+## Find seasonality.
+ 
+ 
+ 
+```{r}
+# difftime(dat$SAMPLE_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "days")
+#"December" "December" "December" "January"  "January"  "January"
+# ?rpoisppd
+```
+
+
+$$
+\lambda(t) = a + b + b \sin(c\,2 \pi/365 + x 2 \,\pi / 365)
+$$
+
+
+
+$$
+l(\lambda) = \log L(\lambda) = - \int_0^T\lambda(x) dx + \sum_{i=1}^n\log \lambda(x_i)
+$$
+
+
+
+```{r}
+lambda<-function(x,params){
+  a<-params[1]
+  b<-params[2]
+  c<-params[3]
+  a + b + b * sin(2 * pi / 365 * c + x * 2 * pi / 365)
+}
+
+neg.log.like<-function(params, data){
+  lower<-min(data)
+  upper<-max(data)
+  integrate(lambda,lower,upper,params,subdivisions = 5000)$value - sum(log(lambda(data,params)))
+}
+mle<-function(data, iterations=1000){
+  fn<-function(par){
+    if (all(par>c(0,2,0))  & all(par<c(100,100,365)) ){
+      neg.log.like(par,data)      
+    }else{
+     100000 
+    }
+  }
+  res<-optimx(as.vector(c(1,10,1)),
+              fn,
+              method='Nelder-Mead',
+              control=list(maxit=iterations))
+  if (res$convcode != 0){
+    cat("optimisation did not converge with code:", res$convergence, "\n")
+  }
+  res[,1:3]
+}
+```
+
+Test the MLE estimator:
+```{r}
+source('baseline_time.r')
+simulate.nhpp<-function(x, lambda, par){
+  max.lambda<-max(lambda(x,par))
+  max.x<-max(x)
+  nhpp<-c()
+  t<-min(x)
+  while(t<max.x){
+    t<-t+rexp(1, max.lambda)
+    if (runif(1) * max.lambda < lambda(t, par)){
+      nhpp<-c(nhpp, t)
+    }
+  }
+  return(nhpp)
+}
+x=1:2000
+nhpp<-simulate.nhpp(x, lambda, c(1,3,100, 0.01))
+# points(nhpp)
+
+nhpp.counts<-data.frame(table(as.integer(nhpp)))
+nhpp.counts<-nhpp.counts[order(nhpp.counts$Var1),]
+nhpp.counts$Var1 = as.numeric(as.character(nhpp.counts$Var1))
+plot(nhpp.counts$Var1, nhpp.counts$Freq, type='p', ylim=c(0,max(nhpp.counts$Freq)))
+lines(x, lambda(x,c(1,3,100)), type='l')
+#lines(x, qpois(0.025,lambda(x,c(1,3,100))), type='l')
+lines(x, qpois(0.975,lambda(x,c(1,3,100))), type='l')
+# p<-unlist(C)
+```
+
+
+```{r}
+source("baseline_time.r")
+# plot(nhpp.counts$Var1, nhpp.counts$Freq, type='p')
+p<-unlist(cmle1(nhpp, res))#
+#points(x, lambda(x,c(1,3,100,0)), col='blue')
+# lines(x, lambda(x,c(1,3,100,0.01)), type='l')
+# 
+# lines(x, lambda(x, unlist(p) ),  col='red')
+# print(p)
+ 
+p #%>% t
+```
+
+```{r}
+plot(nhpp.counts$Var1, nhpp.counts$Freq, type='p')
+lines(x, lambda(x,c(1,3,100,0.01)), type='l')
+lines(x, lambda(x, unlist(c(p,res)) ),  col='red')
+```
+
+```{r}
+source("baseline_time.r")
+res = cmle2(nhpp,  p)
+
+print(res)
+parameters = c(p, res)
+
+plot(nhpp.counts$Var1, nhpp.counts$Freq, type='p')
+# lines(x, lambda(x,c(1,3,100,0.01)), col='red')
+lines(x, lambda(x, unlist(parameters) ),  col='red')
+print(parameters)
+
+```
+
+```{r}
+source("baseline_time.r")
+par = cmle(nhpp, 10)
+plot(nhpp.counts$Var1, nhpp.counts$Freq, type='p')
+lines(x, lambda(x, unlist(par) ),  col='red')
+# print(parameters)
+```
+# Now find a baseline separating time and emmtype component
+
+
+```{r}
+M=list()
+emmtypes = unique(dat$emmtypes2)[-9]
+for (emmtype in emmtypes){
+  M[[emmtype]] = data.frame(table(dat[dat$emmtypes2 == emmtype,"RECEPT_DT_numeric"]))
+  M[[emmtype]]$Var1 = as.integer(as.character(M[[emmtype]]$Var1))
+  names(M[[emmtype]]) = c("day", emmtype)
+}
+A = Reduce(function(x, y) merge(x, y, by='day',all=TRUE, sort=TRUE), M)
+print(dim(A))
+print(length(emmtypes))
+A[is.na(A)] = 0
+plot(range(A[,1]), range(A[,2:128], na.rm = T), col='white')
+for(i in 2:128){lines(A$day, A[,i])}
+
+# dat$RECEPT_DT_numeric = difftime(dat$RECEPT_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "days")
+# dat$SAMPLE_DT_numeric = difftime(dat$SAMPLE_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "days")
+# dat<-dat[dat$SAMPLE_DT_numeric > -1,]
+
+```
+
+
+```{r}
+m_t = rowMeans(A[,2:179])
+m_em = colMeans(A[,2:179])
+M = m_t %*% t(m_em) / mean(m_t) 
+plot(A[,1],A[,3])
+lines(A[,1],M[,2])
+lines(lambda(1:max(A[,1], na.rm = T), c(0, 4, 365 / pi / 2 * 90)), col='red')
+```
+
+```{r}
+plot(A[,1],rowMeans(A[,2:179]))
+lines(lambda(1:max(A[,1],na.rm = T), c(0, 0.02, 365 / pi / 2 * 90)), col='red')
+abline(v=365)
+abline(v=365  *2)
+abline(v=365  *3)
+abline(v=365  *4)
+abline(v=365  *5)
+```
+
+I say there is no periodicity.
+
+
+#  find a baseline separating both time and emmtype component
+
+
+```{r}
+M=list()
+emmtypes = unique(dat$emmtypes2[!is.na(dat$emmtypes2)])
+postcodes = unique(dat$`Patient Postcode`[!is.na(dat$`Patient Postcode`)])
+# 
+# M2 = array(dim = c(2,3,3))
+
+for (emmtype in emmtypes){
+  M[[emmtype]] = data.frame(table(dat[dat$emmtypes2 == emmtype,"RECEPT_DT_numeric"]))
+  M[[emmtype]]$Var1 = as.integer(as.character(M[[emmtype]]$Var1))
+  names(M[[emmtype]]) = c("day", emmtype)
+}
+A = Reduce(function(x, y) merge(x, y, by='day', all=TRUE, sort=TRUE), M)
+print(dim(A))
+print(length(emmtypes))
+A[is.na(A)] = 0
+plot(range(A[,1]), range(A[,2:128], na.rm = T), col='white')
+for(i in 2:128){lines(A$day, A[,i])}
+```
+
+
+
+
+
+#  find a baseline for one emmtype 
+
+```{r}
+# A[,3]
+emmtype = emmtypes[2]
+dat.tmp = dat[dat$emmtypes2 == emmtype, ] 
+unique.postcodes = unique(dat.tmp[!is.na(dat.tmp$`Patient Postcode`),]$`Patient Postcode`)
+
+M1 = list()
+
+for (postcode in unique.postcodes){
+  M1[[postcode]] = data.frame(table(dat[dat$`Patient Postcode` == postcode, "RECEPT_DT_numeric"]))
+  M1[[postcode]]$Var1 = as.integer(as.character(M1[[postcode]]$Var1))
+  names(M1[[postcode]]) = c("day", postcode)
+}
+
+
+A1 = Reduce(function(x, y) merge(x, y, by='day',all=TRUE, sort=TRUE), M1)
+print(dim(A1))
+print(length(unique.postcodes))
+A1[is.na(A1)] = 0
+```
+
+```{r}
+
+# plot(range(A[,1]), range(A[,2:128], na.rm = T), col='white')
+# for(i in 2:128){lines(A$day, A[,i])}
+rownames(A1) = A1$day
+A1$day = NULL
+head(A1)
+s<-colMeans(A1)
+q<-rowMeans(A1)
+media<-mean(unlist(A1))
+mu<- (q %*% t(s)) / media
+mu<-data.frame(data=mu, row.names = rownames(A1))
+names(mu)=names(A1)
+head(mu)
+```
+
+```{r}
+
+```
+
+
+```{r}
+library(truncnorm)
+random_portions<-function(n,  times, X.range, Y.range, border=10000, n.days=10, rs=0.5, a=0){
+  # n is the number of samples
+  # times
+  # border is the dinstance from the boundary
+  # rs is a reference size 
+
+  X.min = X.range[1]
+  X.max = X.range[2]
+  Y.min = Y.range[1]
+  Y.max = Y.range[2]
+  
+  # generate centers in a square:
+  x = runif(n, X.min + border, X.max - border)
+  y = runif(n, Y.min + border, Y.max - border)
+  
+  # generate centers close to the hospitals:
+  # x = sample(Data$X.loc, n, replace = T) + runif(n, -rs/10, rs/10)
+  # y = sample(Data$Y.loc, n, replace = T) + runif(n, -rs/10, rs/10)  
+  
+  # t = sample(1:times, n, replace=TRUE)
+  # dt = sapply(t, function(x){ min(times-x, x-1, sample(1:rt, 1))})
+  # t.upp = rep(times, n)
+  t.upp = sample(n.days:times, n, replace=T)
+
+  # the spatio-temporal portion are in the last n.d days only.
+  # t.low = t.upp - sample(1:n.days, n, replace=T)
+  t.low = t.upp - sample(1:n.days, n, replace=T)
+
+  
+  # generate radia
+  d_max = apply(data.frame(x=x-X.min, y=y-Y.min, xs=X.max-x, ys=Y.max-y), 1, min) # this is min vertical distance from the border.
+  # print(d_max)
+  rho = rtruncnorm(n, mean=rs, sd=rs, a=a, b=d_max)
+  return (data.frame(x=x, y=y, rho=rho, t.low=t.low, t.upp=t.upp))
+}
+
+Y.range = range(dat[!is.na(dat$latitude),]$latitude)
+# [1] 50.83559 55.64878
+X.range = range(dat[!is.na(dat$latitude),]$longitude)
+# [1] -4.717408  0.348140
+
+```
+
+
+
+```{r}
+day.range = rownames(A1) %>% as.integer %>%  range
+# [1]   5 1930
+# rownames(A1) %>% length
+# [1] 315
+portions = random_portions(10000, day.range[2], X.range, Y.range, border =0, rs=1, n.days=100)
+head(portions)
+```
+
+
+
+
+
+<!-- ```{r} -->
+<!-- portions.to.plot = random_portions(10, 100, X.range, Y.range, border =0, rs=0.5, n.days=3) -->
+
+<!-- time_intervals = apply(portions.to.plot, 1, function(x){(seq(x['t.low'], x['t.upp']))}) -->
+<!-- time_layer = do.call(c, time_intervals) -->
+
+<!-- portions.to.plot$time_interval_length<-portions.to.plot$t.upp - portions.to.plot$t.low + 1 -->
+
+<!-- portions.to.plot = portions.to.plot[ -->
+<!--   as.numeric(rep(row.names(portions.to.plot), portions.to.plot$time_interval_length)), -->
+<!--   ] -->
+<!-- portions.to.plot$time_layer = time_layer -->
+
+<!-- par(mfrow=c(3, 3), mar=c(0.4, 0.4, 0.4, 0.4)) -->
+<!-- for (i in min(portions.to.plot$time_layer):max(portions.to.plot$time_layer)){ -->
+<!--   plot(latitude ~ longitude, data=dat, pch=20, asp=1, xaxt='n', yaxt='n') -->
+
+<!--   # plot(baseline[[i]], main=paste('week ', as.character(i)), cols='#473B54', pch=16) -->
+<!--   # plot.ppp(epidemics[[i]], cols='red', add=T, pch=16) -->
+<!--   tmp_portion = portions.to.plot[portions.to.plot$time_layer== i,] -->
+<!--   n_d = dim(tmp_portion)[1] -->
+<!--   if (n_d > 0){ -->
+<!--     for (j in 1:n_d[1]){ -->
+<!--       plot.owin(disc(tmp_portion[j,3], c(tmp_portion[j,1], tmp_portion[j,2])), add=TRUE) -->
+<!--     } -->
+<!--   } -->
+<!-- } -->
+<!-- ``` -->
+
+
+
+```{r}
+nomi = names(A1)
+postcodes_locations = as.data.frame(matrix(data=NA, ncol=3, nrow = length(nomi) ))
+rownames(postcodes_locations) =  nomi
+postcodes_locations$`Patient Postcode` = rownames(postcodes_locations)
+postcodes_locations = apply(postcodes_locations, 1, postcode.to.location)
+rownames(postcodes_locations) = c('latitude', 'longitude')
+postcodes_locations = as.data.frame(postcodes_locations)
+```
+
+
+```{r}
+is_in_circle<-function(Data, x, y, rho){
+  d = sqrt((as.numeric(Data['longitude'])-x)^2 + (as.numeric(Data['latitude'])-y)^2 )
+  res<-ifelse(d<rho, 1, 0)
+  return(res)
+}
+```
+
+```{r}
+compute<-function(portion, Data){
+  # portion is a spatio-temporal portion
+  nomi = colnames(Data)
+  time_steps = seq( as.numeric(portion['t.low']),  as.numeric(portion['t.upp']))
+  columns = intersect(nomi, as.character(time_steps))
+  
+  
+    # check if each row in Data is in the circle (regardless of time)
+  in_circle<-apply(Data, 1, is_in_circle, as.numeric(portion['x']), as.numeric(portion['y']), as.numeric(portion['rho']))
+  if (sum(in_circle) > 0){
+    n_cases_in_interval = 0
+    for(c in columns){
+       n_cases_in_interval = n_cases_in_interval + sum(Data[,c] * in_circle) 
+    }
+
+    # the sum of Poisson RVs is Poisson
+    mu1 = sum(as.matrix(t(mu)[as.logical(in_circle), columns]))
+
+    p.val = ppois(n_cases_in_interval, lambda=mu1, lower.tail=FALSE)
+    return (c( time_steps[2] -time_steps[1] , n_cases_in_interval,  mu1, p.val))
+  }else{
+    return (c(NA,NA,NA,NA))
+  }
+}
+Data = as.data.frame(t(rbind(postcodes_locations, A1)))
+Data1 = Data[!is.na(Data$latitude), ]
+
+portions[,c('n_days', 'n_obs', 'mu', 'p.val')] = t(apply(portions, 1, compute, Data1))
+```
+
+
+Let's tag each cylinder with a `warning` flag:
+```{r}
+# portions$warning = apply(portions, 1, function(x){ifelse(((x[6] < x[7])|(x[6] > x[8])), TRUE, FALSE)})
+portions$warning = apply(portions, 1, function(x){ifelse(x['p.val'] < 0.05, TRUE, FALSE)})
+head(portions)
+portions2=portions[!is.na(portions$n_obs),]
+head(portions2)
+
+portions2
+```
+
+```{r}
+#p.val_sim and p.val are consistent:
+#plot(portions2$'p.val', portions2$'p.val_sim')
+#let's stick to p.val then which is faster to compute.
+```
+
+```{r}
+# points(warning_centers$x, warning_centers$y, col='red', pch=20, cex=0.1)
+warnings=portions2[portions2$warning == TRUE, ]
+non_warnings=portions2[portions2$warning == FALSE, ]
+```
+
+
+
+
+
+
+

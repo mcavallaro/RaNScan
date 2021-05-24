@@ -1,0 +1,89 @@
+---
+title: "Data description for Aoife"
+author: "Massimo Cavallaro"
+date: "16 April 2019"
+output:
+  word_document: default
+---
+
+
+```{r include=FALSE}
+plot.w<-function(df, emmtype){
+plot(c(96,298), c(0,1), col='white', xlab = 'week', ylab = 'warning score', main=paste0('emmtype ', emmtype))
+for (i in 1:680){
+  if( !is.na(dataframe1[i,'x'])){
+    lines(96:298, unlist(dataframe1[i,16:218]))
+  }
+}  
+}
+```
+
+
+Here is a simple description of the columns in the spreadsheet files I'm sharing. The first 15 columns are existing data (many can be safely ignored, I left these for my own convenience, hope is OK.):
+
+
+  * "FULLNO": Patient identifier.
+  * "Patient.Postcode": patient address postcode
+  * "SAMPLE_DT": this is the  specimen collection date (used in the algorithm)
+  * "RECEPT_DT": emm type is known a week after collection, in average.
+  * "Isolation.Site.Decoded": all specimens are isolated sterile sites (this can be ignored)
+  * "Sterile.Site.Y.N": (can be ignored)
+  * "emm.gene.type": all entries in each of these files are of the same emmtype, so this can be ignored.
+  * "emmtype": emm type (can be ignored)
+  * "RECEPT_DT_numeric":  the dates above were converted to week number, with week 1 corresponding to  "08/01/15", week 2 corresponding to  "15/01/15",etc... up to week 298 ("17/09/20")
+  * "SAMPLE_DT_numeric": same as above
+  * "lag" (can be ignored)
+  * "latitude": postcode latitude (needed for the algorithm, can be ignored)
+  * "longitude": postcode longitude (needed for the algorithm)
+  * "y": geographical coordinates converted in km(needed for the algorithm)
+  * "x": geographical coordinates converted in km(needed for the algorithm)
+
+The remaing 202 columns ("week96", "week97", "week98", etc, ...) contain the warning scores computed at the labelled week.
+
+As an example, the 10th entry in file `emmtype_33.0_sf1.2.csv`, row 10, has date 2019-01-24, which corresponds to week 212. Accordingly, all the warning scores entries from "week96" to "week212" are zero; after that a new warning score is computed for each week (from "week213" onwards) so that you can see how the warning level is updated as new iGAS cases are detected. I made the following plots in `r` to show this latter point.
+
+
+# emmtype '33.0'
+
+```{r}
+dataframe1 = read.csv('emmtype_33.0_sf1.2.csv', row.names = 1)
+plot.w(dataframe1, '33.0')
+```
+
+```{r eval=FALSE, include=FALSE}
+png('Fig/prospective_33.0.png', width = 4 * 1.2 , height = 3 * 1.2, units = 'in', res=400, pointsize = 9)
+plot.w(dataframe1, '33.0')
+dev.off()
+```
+
+# emmtype '1.0'
+
+```{r}
+dataframe1 = read.csv('emmtype_1.0_sf1.2.csv', row.names = 1)
+plot.w(dataframe1 , '1.0')
+```
+
+
+```{r eval=FALSE, include=FALSE}
+png('Fig/prospective_1.0.png', width = 4 * 1.2 , height = 3 * 1.2, units = 'in', res=400, pointsize = 9)
+plot.w(dataframe1, '1.0')
+dev.off()
+```
+
+
+# emmtype '44.0'
+
+```{r}
+dataframe1 = read.csv('emmtype_44.0_sf1.2.csv', row.names = 1)
+plot.w(dataframe1, '44.0')
+```
+
+```{r eval=FALSE, include=FALSE}
+png('Fig/prospective_44.0.png', width = 4 * 1.2 , height = 3 * 1.2, units = 'in', res=400, pointsize = 9)
+plot.w(dataframe1, '44.0')
+dev.off()
+```
+
+
+
+

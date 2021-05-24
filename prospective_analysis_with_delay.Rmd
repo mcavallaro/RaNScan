@@ -1,0 +1,138 @@
+---
+title: "Prospective analysis with delay"
+---
+
+```{r}
+source("ranScanInit2.r")
+case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
+case.df = ranScanInit(case.file)
+```
+
+
+
+```{r}
+emmtype='12.0'
+n.weeks = 150
+starting.week = 80
+ranScanCreateObservationMatrices_(case.file, emmtype, starting.week = starting.week, n.weeks = n.weeks)
+```
+
+
+```{r}
+load(sprintf("Data/%s_typed_obs.Rdata", emmtype), verbose = 1)
+load('Data/untyped_obs.Rdata', verbose = 1)
+
+print(head(names(observation.matrices.untyped)))
+observation.matrices.untyped[['150']][1:5,1:5]
+observation.matrices.untyped[[10]] %>% rownames %>% head
+observation.matrices.typed[[emmtype]][['150']][1:5,1:5]
+```
+
+
+```{r}
+init=Sys.time()
+postcode2coord = ranScanPostcodeMap(observation.matrices.untyped[[1]])
+print(Sys.time()-init)
+```
+
+```{r}
+time.factor = ranScanTimeFactor(case.file)
+baseline.matrix = ranScanCreateBaselineMatrix(case.file)
+```
+
+```{r}
+emmtype.factor = ranScanEmmtypeFactor.tau(case.file, emmtype)
+delay.factor = ranScanEmmtypeFactor.delay_(case.file, starting.week = starting.week, n.weeks = n.weeks)
+```
+
+```{r}
+for (t in c('150', '160')){
+  cols = colnames(observation.matrices.untyped[[t]])
+  emt.factor = emmtype.factor[[emmtype]][cols]
+  dly.factor = delay.factor
+  
+  bsl.matrix.typed = baseline.matrix[,cols] * rep((1 - dly.factor) * emt.factor,
+                                                      rep(NROW(baseline.matrix[,cols]), NCOL(baseline.matrix[,cols])))
+  
+  bsl.matrix.untyped = baseline.matrix[,cols] * rep(dly.factor,
+                                                      rep(NROW(baseline.matrix[,cols]), NCOL(baseline.matrix[,cols])))
+  x = as.integer(colnames(observation.matrices.typed[[emmtype]][[t]]))
+  y = colSums(observation.matrices.typed[[emmtype]][[t]])
+  y1 = colSums(observation.matrices.untyped[[t]])
+  plot(range(x), c(0, max(c(y,y1))), xlab = bquote(tau~'[week]'), ylab='no. cases per week', col=NA,
+       main=sprintf('screenshot at week %s', t))
+  y = ifelse(y > 0, y, NA)
+  y1 = ifelse(y1 > 0, y1, NA)
+  points(x, y, col='red', pch=20)
+  points(x, y1)
+  idx = !(rownames(bsl.matrix.typed) == 'NA')
+  lines(x, colSums(bsl.matrix.typed[idx,]), col='red')
+  lines(x, colSums(bsl.matrix.untyped[idx,]))
+  legend('topleft', legend=c(sprintf('emm %s observations', emmtype), 'untyped observations', sprintf('emm %s baseline',emmtype), 'untyped baseline'), pch=c(20, 1, NA, NA), col=c('red','black','red','black'), lty = c(NA,NA,1,1))
+}
+```
+
+
+```{r}
+source("ranScanEvaluate.r")
+```
+
+```{r}
+sizefactor = 1.2
+n_cyl = 5000
+weeks = attributes(observation.matrices.untyped)$names
+n.rows = sum(case.df$emmtype == emmtype)
+n.cols = len(weeks)
+
+to.export = as.data.frame(matrix(NA, nrow = n.rows, ncol = n.cols))
+names(to.export) = mapply(function(x){paste0('week.', x)}, as.character(weeks))
+
+dly.factor = delay.factor
+  
+for (week in weeks){
+  # week.min = max(1, week - 200)
+  # week.range = c(1, week)
+  # cat('week', week, week.range, '\t')
+  
+  obs.matrix.untyped = observation.matrices.untyped[[week]]
+  obs.matrix.typed = observation.matrices.typed[[emmtype]][[week]]
+  obs.matrix = obs.matrix.untyped + obs.matrix.typed
+  cols = colnames(obs.matrix)
+  emt.factor = emmtype.factor[[emmtype]][cols]
+
+  # moltiplicazione columnwise
+  bsl.matrix.typed = baseline.matrix[,cols] * rep( (1 - dly.factor)*emt.factor,
+                                                     rep(NROW(baseline.matrix[,cols]), NCOL(baseline.matrix[,cols])))
+  bsl.matrix.untyped = baseline.matrix[,cols] * rep( dly.factor,
+                                                     rep(NROW(baseline.matrix[,cols]), NCOL(baseline.matrix[,cols]))) 
+  #
+  bsl.matrix = bsl.matrix.typed + bsl.matrix.untyped
+  week.range = range(as.integer(cols))
+  #print(c(sum(obs.matrix[-2,]), sum(bsl.matrix[-2,])))
+   cylinders = ranScanCreateCylinders(obs.matrix, bsl.matrix, emmtype, week.range, n_cyl, postcode2coord, size_factor = sizefactor)
+  # 
+  case.df.tmp = ranScanEvaluate(case.file, cylinders, emmtype, p.val.threshold=0.05)
+  ws = case.df.tmp[case.df.tmp$emmtype == emmtype,]$warning.score
+  i = as.integer(week) - as.integer(weeks[1]) + 1
+  to.export[, i] = ws
+}
+
+dataframe.to.export = cbind(case.df.tmp[case.df.tmp$emmtype == emmtype,], to.export)
+dataframe.to.export$warning.score = NULL
+#plot(weeks, unlist(dataframe.to.export[2,16:218]))
+```
+
+```{r}
+plot(range(weeks), c(0,1), col='white')
+L = NCOL(dataframe.to.export)
+for (i in 1:2300){
+  if( !is.na(dataframe.to.export[i,'x'])){
+    lines(weeks, unlist(dataframe.to.export[i,16:L]))
+  }
+}
+abline(h=0.95)
+```
+
+
+
+

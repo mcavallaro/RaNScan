@@ -1,0 +1,379 @@
+---
+title: "Simulation experiment"
+#output: html_notebook
+---
+
+```{r}
+size_factor_epi = 4
+n.endemic_cases = 5000
+label.str = paste(as.character(size_factor_epi), as.character(n.endemic_cases),  sep = '_')
+```
+
+
+```{r}
+source('utils.R')
+source("ranScanEvaluate.r")
+```
+
+
+Simulation of cases in England.
+Generate data according to the baseline which is proportional to postcode population and 
+and a temporal trend (saved in `time.factor`).
+`no.endemic_cases` is the total number of cases to be simulate.
+
+```{r}
+#head(Population_)
+#idx = apply(Population_, 1, postcode.in.england, 'Postcode')
+#population = Population_[idx, 2]
+#names(population)  = Population_[idx, 1]
+#save(population, file = "Data/population_of_england.RData")
+load("Data/population_of_england.RData")
+load('Data/time.factor.RData')
+head(population)
+```
+
+
+```{r}
+set.seed(1)
+idx=sort(sample(length(population), 10000))
+sample.population = population[idx]
+# simulate the cases. 
+sim=ranScanSimulate(sample.population, time.factor[-1][1:100], n.endemic_cases)
+
+```
+
+
+Map aggregated synthetic data to their geographical coordinates.
+
+```{r}
+#geo.location = t(sapply(names(population), postcode.to.location3))
+#save(geo.location, file = "Data/geo.location_of_england.RData")
+```
+
+
+```{r}
+load("Data/geo.location_of_england.RData")
+df.population = cbind(geo.location[idx,], sample.population)
+df.cases = cbind(geo.location[idx,], rowSums(sim))
+colnames(df.cases) = c('latitude', 'longitude', 'n.cases')
+df.cases = as.data.frame(df.cases)
+head(df.cases)
+df = data.frame(longitude = rep(df.cases[,'longitude'], df.cases[,'n.cases']),
+             latitude = rep(df.cases[,'latitude'], df.cases[,'n.cases']))
+```
+
+
+Generate more data around St. Albans (AL1 and AL2) from time 40 to time 60.
+
+```{r}
+idx1 = grepl('AL1', rownames(sim), fixed=T)
+idx1 = idx1 | grepl('AL2', rownames(sim), fixed=T)
+cat("the numer of postcodes with AL1 or AL2 is", sum(idx1))
+```
+
+
+```{r}
+set.seed(1)
+epi = rpois(n = sum(idx1) * 20, lambda=rep(dnorm(-9:10, sd = 4) * size_factor_epi, rep(sum(idx1), 20)))
+save(epi, file = "Data/simulated_larger_epidemic.RData")
+cat("the numer of epidemic cases is", sum(epi))
+```
+
+
+```{r}
+epi.matrix = matrix(epi, ncol = 20)
+plot(40:59, colSums(epi.matrix), col='#d62728', xlab='t', pch=20, ylab='no. epidemic cases')
+rownames(epi.matrix) = row.names(sim)[1:21]
+colnames(epi.matrix) = 40:59 
+epi.matrix[1:3,1:3]
+#png(paste0('Fig/epi_time_', label.str, '.png'), width = 4 * 1.2, height = 3, units = 'in', res=400, pointsize = 13)
+par(mar=c(4,4,1,1)+0.1)
+plot(40:59, colSums(epi.matrix), col=ifelse(colSums(epi.matrix) > 0,'#d62728','white'), xlab='t', pch=20, ylab='no. epidemic cases')
+#dev.off()
+```
+
+
+Aggregate epidemic and endemic cases and plot. It is worth noting that it is essentially impossible to visually detect the epidemic element from these aggregate data.
+
+```{r}
+#print(sum(sim))
+sim2 = sim
+sim2[1:21, 40:59] = sim2[1:21, 40:59] + epi.matrix
+par(mfrow = c(1, 2))
+
+plot(colSums(sim), xlab='t', col='#1f77b4', pch=20, ylab='no. cases', main='endemic')
+lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
+mtext('A', side=3, padj=2, at=95, cex=2)
+plot(colSums(sim2), pch=20, xlab='t', main='endemic + epidemic',  ylab='no. cases')
+lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
+mtext('B', side=3, padj=2, at=95, cex=2)
+
+
+#png(paste0('Fig/end_epi_temporal_',label.str,'.png'), width = 4 * 1.2 * 2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
+par(mfrow = c(1, 2), mar=c(4,4,1,1)+0.1)
+plot(colSums(sim), xlab='t', col='#1f77b4', pch=20, ylab='no. cases', main='endemic')
+lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
+mtext('A', side=3, padj=2, at=95, cex=2)
+plot(colSums(sim2), pch=20, xlab='t', main='endemic + epidemic',  ylab='no. cases')
+lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
+mtext('B', side=3, padj=2, at=95, cex=2)
+#dev.off()
+```
+
+
+
+
+
+```{r}
+df.cases2 = cbind(geo.location[idx,], rowSums(sim2))
+df.cases2 = as.data.frame(df.cases2)
+df.cases2 = cbind(rownames(geo.location[idx,]), df.cases2)
+colnames(df.cases2) = c('Postcode','latitude', 'longitude', 'n.cases')
+df2 = data.frame(longitude = rep(df.cases2[,'longitude'], df.cases2[,'n.cases']),
+             latitude = rep(df.cases2[,'latitude'], df.cases2[,'n.cases']))
+
+par(mfrow = c(1, 2))
+plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic')
+#plotBaseMap(add=T, Wales=F)
+mtext('A', side=3, padj=2, at=1, cex=2)
+
+plot(df2$longitude, df2$latitude,axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic + epidemic')
+#plotBaseMap(add=T, Wales=F)
+mtext('B', side=3, padj=2, at=1, cex=2)
+
+#png(paste0('Fig/end_epi_spatial1_', label.str, '.png'), width = 4 * 1.2 * 2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
+par(mfrow = c(1, 2), mar=c(1,1,2,1)+0.1)
+plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, ylab=NA, main='endemic', ylim = c(50,56))
+plotBaseMap(add=T, Wales=F)
+mtext('A', side=3, padj=2, at=1, cex=2)
+
+plot(df2$longitude, df2$latitude,axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, main='endemic + epidemic', ylim = c(50,56))
+plotBaseMap(add=T, Wales=F)
+mtext('B', side=3, padj=2, at=1, cex=2)
+
+#dev.off()
+rm(df2)
+```
+
+
+
+Apply RaNScan. The matrix data must be converted in list data (as the iGAS dataset).
+```{r}
+case.df = as.data.frame(which(sim2 == 1, arr.ind = TRUE))
+case.df$postcode = rownames(sim2)[case.df$row]
+for (i in 2:max(c(sim2))){
+  case.df.tmp = as.data.frame(which(sim2 == i, arr.ind = TRUE))
+  case.df.tmp$postcode = rownames(sim2)[case.df.tmp$row]
+  case.df = rbind(case.df, case.df.tmp[rep(seq_len(NROW(case.df.tmp)), i),])
+}
+
+case.df = cbind(case.df, df.population[case.df[,'row'],])
+names(case.df) = c('row','SAMPLE_DT_numeric', 'postcode', 'latitude', 'longitude', 'population')
+case.df[, c('y','x')] = vlatlong2km(case.df[,c('latitude', 'longitude')])
+tail(case.df)
+```
+
+Generate the baseline matrix.
+```{r}
+b.matrix = sample.population %o% time.factor[-1][1:100]
+b.matrix = b.matrix / sum(b.matrix) * n.endemic_cases
+```
+
+```{r}
+set.seed(1)
+start_time <- Sys.time()
+cylinders = ranScanCreateCylinders(observation.matrix = sim2, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(1,100), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.2)
+
+set.seed(1)
+cylinders2 = ranScanCreateCylinders(observation.matrix = sim2, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(1,100), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.5)
+
+case.df[,'warning.score'] = apply(case.df, 1, FUN=warning.score, cylinders)
+case.df[,'warning.score2'] = apply(case.df, 1, FUN=warning.score, cylinders2)
+
+cat("estimate of computation time:","\n")
+print((Sys.time() - start_time)/2)
+#only takes 5 minuts on the i5 laptop.
+```
+
+Compare with the warning scores generated using a different cylinder size
+
+```{r}
+#case.df.warning.score.old = case.df$warning.score
+ctest = cor.test( case.df$warning.score2, case.df$warning.score)
+ctest
+print(ctest$estimate)
+print(ctest$p.value)
+colors = ifelse(case.df$true_positive, "#d6272844", "#1f77b444")
+plot(case.df$warning.score, case.df$warning.score2,
+     xlab = 'replicate 1', ylab = 'replicate 2', col=colors, pch=ifelse(case.df$true_positive, 20,1))
+
+png(paste0('Fig/corrplot', label.str, '.png'), width = 3.25, height = 3.25, units = 'in', res=400, pointsize = 13)
+par(mfrow=c(1,1), mar=c(4,4,1,1))
+plot(case.df$warning.score, case.df$warning.score2,
+     xlab = expression(paste(italic(w),' (rep. 1)')), ylab = expression(paste(italic(w)," (rep. 2)")), col=colors, pch=ifelse(case.df$true_positive, 20,1))
+legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"), pch=c(20,1))
+
+dev.off()
+```
+
+```{r}
+case.df.endemic = as.data.frame(which(sim == 1, arr.ind = TRUE))
+case.df %>% head
+```
+
+
+
+
+```{r}
+case.df.epidemic =  which(epi.matrix > 0,  arr.ind = T)
+case.df$true_positive = apply(case.df, 1, function(x){ ( as.numeric(x['row']) %in% case.df.epidemic[,'row']) & (as.numeric(x['SAMPLE_DT_numeric']) %in% (case.df.epidemic[,'col'] + 39) )})
+# add 39 beacuse epi.matrix starts from time index 40.
+```
+
+
+```{r}
+
+library(pROC)
+ROC = roc(case.df$true_positive, case.df$warning.score)
+print(ROC)
+plot(ROC)
+L = NROW(case.df)
+col = '#00000033'
+png(paste0('Fig/ROC_',label.str,'.png'), width = 3.25, height = 3.25, units = 'in', res=400, pointsize = 13)
+par(mfrow=c(1,1), mar=c(4,4,0,0))
+auc = numeric(0)
+plot(ROC, col='black', identity.col='black',  grid.col='red')
+for (i in 1:50){
+  cc = roc(true_positive ~ warning.score, case.df[sample(1:L, L, replace = T),])
+  if(i < 11){
+    plot(cc, add=T, col=col, identity.col='black')    
+  }
+  auc = c(auc, as.numeric(cc['auc'][[1]]))
+}
+dev.off()
+print(quantile(auc, c(0.025,0.5,0.975) ))
+```
+
+
+```{r}
+plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t', ylab=expression(italic(w)),
+     col=ifelse(case.df$true_positive, "#d62728", "#1f77b4"), pch=ifelse(case.df$true_positive, 20, 1))
+png(paste0('Fig/ws_time_',label.str,'.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
+par(mfrow=c(1,1), mar=c(4,4,1,1))
+plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t', ylab=expression(italic(w)),
+     col=ifelse(case.df$true_positive, "#d6272855", "#1f77b455"), pch=ifelse(case.df$true_positive, 20, 1))
+legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"), pch=c(20,1))
+dev.off()
+
+```
+
+
+
+```{r}
+# palette = colorRampPalette(c('#1f77b4', '#d62728'))(100)
+idx1 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score < 0.95)
+#colors = palette[as.integer(case.df[idx,]$warning.score * 100)+1]
+idx2 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score > 0.95)
+plot(case.df[idx1,]$longitude, case.df[idx1,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA)
+points(case.df[idx2,]$longitude, case.df[idx2,]$latitude, col='#d62728', pch=20, cex=1, ylab = NA, xlab=NA)
+plotBaseMap(add=T, Wales = F)
+
+png(paste0('Fig/end_epi_spatial_',label.str,'.png'), width =  4 *1.2, height = 3 *1.2, units = 'in', res=400, pointsize = 13)
+par(mfrow = c(1, 1), mar=c(1,1,1,1)+0.1)
+
+plot(case.df[idx1,]$longitude, case.df[idx1,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA, ylim = c(50,56), xlim = c(-5.9, 1.8))
+points(case.df[idx2,]$longitude, case.df[idx2,]$latitude, col='#d62728', pch=20, cex=1, ylab = NA, xlab=NA)
+plotBaseMap(add=T, Wales = F)
+legend('topleft', c( expression(italic(w)>=0.95),expression(italic(w)<0.95)), col=c("#d6272855", "#1f77b455"), pch=c(20,1))
+dev.off()
+```
+
+
+
+
+
+
+test timeliness
+```{r}
+set.seed(1)
+for (i in 40:59){
+cylinders = ranScanCreateCylinders(observation.matrix = sim2[,1:i], baseline.matrix = b.matrix[,1:i], emmtype = 'sim', week.range = c(1,i), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.2)
+case.df[,paste0('warning.score',as.character(i))] = apply(case.df, 1, FUN=warning.score, cylinders)  
+}
+
+```
+
+
+```{r}
+png(paste0('Fig/timelines_', label.str, '.png'), width = 4 * 1.2, height = 3, units = 'in', res=400, pointsize = 13)
+par(mar=c(4,4,1,1)+0.1)
+
+plot(c(41,59), range(case.df[case.df$true_positive,11:30]), col='white', xlab = expression(tau),
+     ylab=expression(italic(w)), axes = FALSE)
+for(i in 1:NROW(case.df[case.df$true_positive, 11:30])){
+  t1 = case.df[case.df$true_positive,][i,'SAMPLE_DT_numeric'] +1
+  id = t1 - 40 + 11
+  if (t1 <= 59){
+    lines(t1:59, case.df[case.df$true_positive,][i, id:30], col='#d62728')
+    points(t1:59, case.df[case.df$true_positive,][i, id:30], pch=20, cex=0.4, col='#d62728')
+  }
+}
+axis(2, at=c(0,0.25,0.5,0.75,1))
+axis(1, at = seq(40,59))
+dev.off()
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# palette = colorRampPalette(c('#1f77b4', '#d62728'))(100)
+idx1 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score < 0.95)
+#colors = palette[as.integer(case.df[idx,]$warning.score * 100)+1]
+idx2 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score > 0.95)
+
+
+
+png(paste0('Fig/timeliness_panel_', label.str,'.png'), width = 5 * 2.8, height = 4, units = 'in', res=600, pointsize = 20)
+par(mfrow=c(1, 3), mar= c(4, 4, 0.5, 0.5) )
+
+plot(40:59, colSums(epi.matrix), col=ifelse(colSums(epi.matrix) > 0,'#d62728','white'), xlab='t', pch=20, ylab='no. epidemic cases')
+mtext('A', side=3, padj=2, at=57, cex=1.5)
+
+plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t', ylab=expression(italic(w)),
+     col=ifelse(case.df$true_positive, "#d6272855", "#1f77b455"), pch=ifelse(case.df$true_positive, 20, 1))
+legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"), pch=c(20,1))
+mtext('B', side=3, padj=2, at=95, cex=1.5)
+
+
+plot(c(41,59), range(case.df[case.df$true_positive,11:30]), col='white', xlab = expression(tau),
+     ylab=expression(italic(w)), axes = FALSE)
+for(i in 1:NROW(case.df[case.df$true_positive, 11:30])){
+  t1 = case.df[case.df$true_positive,][i,'SAMPLE_DT_numeric'] +1
+  id = t1 - 40 + 11
+  if (t1 <= 59){
+    lines(t1:59, case.df[case.df$true_positive,][i, id:30], col='#d62728')
+    points(t1:59, case.df[case.df$true_positive,][i, id:30], pch=20, cex=0.4, col='#d62728')
+  }
+}
+axis(2, at=c(0,0.25,0.5,0.75,1))
+axis(1, at = seq(40,59))
+mtext('C', side=3, padj=2, at=42, cex=1.5)
+dev.off()
+```
+
+
+
+
+
+
