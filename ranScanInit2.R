@@ -46,7 +46,7 @@ ranScanInit<-function(case.file){ #}, postcode.file=default.postcode.file){
       case.df = case.df[idx,]      
     }
     
-    idx = case.df$SAMPLE_DT_numeric < case.df$RECEPT_DT_numeric
+    idx = case.df$SAMPLE_DT_numeric <= case.df$RECEPT_DT_numeric
     if (any(idx)){
       case.df = case.df[idx,]
     }
@@ -534,7 +534,7 @@ ranScanCreateBaselineMatrix<-function(case.file){
         baseline.matrix[i,j] = time.factor[j] * spatial.factor[i]
     }
   }
-  baseline.matrix = as(baseline.matrix / sum(spatial.factor, na.rm = T), "sparseMatrix")
+  baseline.matrix = baseline.matrix / sum(spatial.factor, na.rm = T)
   save.and.tell("baseline.matrix", file=paste0(case.file, "_bas.Rdata"))
   return(baseline.matrix)
 }

@@ -32,9 +32,6 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
   baseline.matrix = baseline.matrix[!(rownames(baseline.matrix) == 'NA'),]
   week.range = range(as.integer(week.range))
   
-  print(sum(baseline.matrix) )
-  print(sum(observation.matrix))
-  
   if (sum(baseline.matrix) > 2 * sum(observation.matrix)){
     warning("Warning: the baseline is too high. Have you multiplied for the emmtype factor? e.g., `ranScanCreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['12.0']], '12.0', starting.week, n.cylinders=100, rs=0.1)`")
   }
@@ -92,17 +89,22 @@ ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix
   #' @param rs
   #' @param p.val.threshold
   #' @param plot (boolean)
-  observation.matrix.typed= observation.matrix.typed[!(rownames(observation.matrix.typed) == 'NA'),]
-  baseline.matrix.typed = baseline.matrix.typed[!(rownames(baseline.matrix.typed) == 'NA'),]
-  observation.matrix.untyped = observation.matrix.untyped[!(rownames(observation.matrix.untyped) == 'NA'),]
-  baseline.matrix.untyped = baseline.matrix.untyped[!(rownames(baseline.matrix.untyped) == 'NA'),]
-  
+  #' 
+  #' 
+  observation.matrix.typed= as.matrix(observation.matrix.typed[!(rownames(observation.matrix.typed) == 'NA'),])
+  baseline.matrix.typed = as.matrix(baseline.matrix.typed[!(rownames(baseline.matrix.typed) == 'NA'),])
+  observation.matrix.untyped = as.matrix(observation.matrix.untyped[!(rownames(observation.matrix.untyped) == 'NA'),])
+  baseline.matrix.untyped = as.matrix(baseline.matrix.untyped[!(rownames(baseline.matrix.untyped) == 'NA'),])
+
   week.range = range(as.integer(week.range))
   
   c1 = sum(baseline.matrix.typed) > 2 * sum(observation.matrix.typed)
   c2 = sum(baseline.matrix.untyped) > 2 * sum(observation.matrix.untyped)
-  if (c1 | c2){
-    warning("Warning: the baseline is too high. Have you multiplied for the emmtype factor? e.g., `ranScanCreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['12.0']], '12.0', starting.week, n.cylinders=100, rs=0.1)`")
+  if (c1){
+    warning("Warning: the typed baseline is very high.")
+  }
+  if (c2){
+    warning("Warning: the untyped baseline seems is very high.")
   }
   init=Sys.time()
   coord.df = coord.df[!is.na(coord.df$latitude),]

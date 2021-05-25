@@ -194,7 +194,7 @@ ranScanSimulate<-function(population, time.factor, total.average){
   simulation = rpois(length(flatten.baseline.matrix), lambda=flatten.baseline.matrix)
   simulation = matrix(simulation, ncol=n.col)
   rownames(simulation) = as.character(names(population))
-  colnames(simulation) = time.factor
+  colnames(simulation) = as.character(names(time.factor))
   return(simulation)
 }
 

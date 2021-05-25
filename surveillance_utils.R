@@ -27,7 +27,7 @@ rcylinder2<-function(n.cylinders, observation.matrix, week.range, radia_and_heig
   cols = as.character(week.range[1]:week.range[2])
   cases = which(observation.matrix[, cols] > 0, arr.ind = T)
   # cases is of the form:
-  # row col
+  #           row col
   # PL15 9NE 5851 231
   # SY11 3PN 6370 255
   if (sum(observation.matrix[, cols]) > 0){
@@ -46,14 +46,18 @@ rcylinder2<-function(n.cylinders, observation.matrix, week.range, radia_and_heig
 
     y = y + sin(theta) * random_radia
     x = x + cos(theta) * random_radia
+    tt = t
     t = t + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1]/2))
     t.low = t - round(radia_and_heights[,1] / 2)
-    t.min = as.integer(cols[1])
+    t.min = as.integer(week.range[1])
     t.low = ifelse(t.low >= t.min, t.low, t.min)
-    t.upp = t.low + radia_and_heights[,1]
-    t.max = as.integer(cols[ncol(obs.matrix)])
-    t.upp = as.integer(ifelse(t.upp <= t.max, t.upp, t.max))
+
+    t.upp = tt + round(radia_and_heights[,1] / 2)
+    t.max = as.integer(week.range[2])
+    t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
+
     t.low = as.integer(ifelse(t.low == t.max, t.low - 1, t.low))
+    
     return(data.frame(x=x, y=y, rho=rho, t.low=t.low, t.upp=t.upp))
   }else{
     return(data.frame(x=double(), y=double(), rho=double(), t.low=integer(), t.upp=integer()))    
@@ -114,7 +118,6 @@ compute<-function(cylinder, observation.matrix, baseline.matrix, postcode.locati
       (as.numeric(postcode.locations$latitude)  - as.numeric(cylinder['y']))^2
   )
   in_circle = (d<as.numeric(cylinder['rho'])) & (!is.na(d))
-  
   n_cases_in_cylinder = sum(observations[in_circle, ], na.rm=T)
   # postcodes<-paste(rownames(observations[in_circle, ]), collapse = ",")
   # the sum of Poisson RVs is Poisson
@@ -239,7 +242,7 @@ warning.score<-function(case, cylinders){
   
   # vettorizzato
   d = sqrt((cylinders$x - x)^2 + (cylinders$y - y)^2)
-  in_circle = as.integer(d < cylinders$rho)
+  in_circle = as.integer(d <= cylinders$rho)
   
   ## da vettorizzare
   # in_cylinder_height = apply(cylinders, 1,  function(X){
@@ -247,7 +250,7 @@ warning.score<-function(case, cylinders){
   # })
   
   # vettorizzato
-  in_cylinder_height = as.integer((cylinders$t.low < TT) & (cylinders$t.upp > TT))
+  in_cylinder_height = as.integer((cylinders$t.low <= TT) & (cylinders$t.upp >= TT))
   
   # # number of cylinders that include geo-coordinate of `case`
   in_cylinder = sum(in_circle * in_cylinder_height, na.rm=T)

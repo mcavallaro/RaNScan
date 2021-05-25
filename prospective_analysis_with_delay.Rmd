@@ -126,7 +126,6 @@ legend('topleft',legend = c('data', 'fit'), col = c('#1f77b4','#ff7f0e'), lty = 
 # tab:cyan : #17becf
 ```
 
-
 ```{r include=FALSE}
 source("ranScanEvaluate.r")
 ```
@@ -147,7 +146,7 @@ for (week in weeks){
   # week.min = max(1, week - 200)
   # week.range = c(1, week)
   # cat('week', week, week.range, '\t')
-  
+  writeLines(week)
   obs.matrix.untyped = observation.matrices.untyped[[week]]
   obs.matrix.typed = observation.matrices.typed[[emmtype]][[week]]
 #  obs.matrix = obs.matrix.untyped + obs.matrix.typed
@@ -191,35 +190,39 @@ for (i in 1:2300){
 }
 abline(h=0.95)
 
-write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '_with_delay_sf1.2.csv'))
+write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '_with_delay2_sf1.2.csv'))
 ```
 
 
 # comparison delay vs no-delay
 
 ```{r}
-emmtype_44_0_with_delay_sf1_2 <- read.csv("emmtype_44.0_with_delay_sf1.2.csv")
+#emmtype_44_0_with_delay_sf1_2 <- read.csv("emmtype_44.0_with_delay_sf1.2.csv")
 emmtype_44_0_sf1_2 <- read.csv("emmtype_44.0_sf1.2.csv")
+rownames(emmtype_44_0_sf1_2) = emmtype_44_0_sf1_2$X
+tmp = emmtype_44_0_sf1_2[dataframe.to.export$X,]
+idx = which(tmp[, 219] > 0.8)
 
 weeks = 150:293
-plot(range(weeks), c(0,1), col='white', xlab = 'week', ylab='warning score')
 for (i in 1:2300){
-  if( !is.na(emmtype_44_0_sf1_2[i,'x'])){
-    lines(weeks, unlist(emmtype_44_0_sf1_2[i,71:214]))
+  if( !is.na(tmp[i,'x']) & i %in%  idx){
+    title = sprintf("sampled %d - typed on %d", tmp[i,'SAMPLE_DT_numeric'], tmp[i,'RECEPT_DT_numeric'] )
+    plot(c(150,293), c(0,1), col='white', xlab = 'week', ylab='warning score', main=title)
+    lines(150:293, unlist(dataframe.to.export[i,16:159]), xlab = 'week', ylab='warning score')
+    lines(96:298, unlist(tmp[i,17:219]), col='red')
+    abline(h=0.95, col='grey')
   }
 }
-abline(h=0.95)
 
-
-weeks = 150:293
-plot(range(weeks), c(0,1), col='white', xlab = 'week', ylab='warning score')
-L = NCOL(emmtype_44_0_with_delay_sf1_2)
-for (i in 1:2300){
-  if( !is.na(dataframe.to.export[i,'x'])){
-    lines(weeks, unlist(emmtype_44_0_with_delay_sf1_2[i,17:L]))
-  }
-}
-lines(150:290, time.factor[150:290] / 40, col='red')
-abline(h=0.95)
+# weeks = 150:293
+# plot(range(weeks), c(0,1), col='white', xlab = 'week', ylab='warning score')
+# L = NCOL(emmtype_44_0_with_delay_sf1_2)
+# for (i in 1:2300){
+#   if( !is.na(dataframe.to.export[i,'x'])){
+#     lines(weeks, unlist(emmtype_44_0_with_delay_sf1_2[i,17:L]))
+#   }
+# }
+# lines(150:290, time.factor[150:290] / 40, col='red')
+# abline(h=0.95)
 ```
 
