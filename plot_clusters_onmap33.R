@@ -1,7 +1,6 @@
 
 emmtype = '33.0'
 
-
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
 load(paste0("~/Outbreak/Data/", emmtype, "_obs.Rdata"))
 baseline.matrix = ranScanCreateBaselineMatrix(case.file)
@@ -37,8 +36,6 @@ png(paste('Manuscript/', emmtype, 'thresh.png', sep='_'),
 ranScanPlotCluster(tmp.33, case.df.tmp1, emmtype, threshold=0.95)
 dev.off()
 
-
-# 
 # # idxx = (tmp[,1] < 9.5) & (tmp[,1] > 3.5)
 # # idxy = (tmp[,2] < -3.5) & (tmp[,2] > -9.5)
 # 

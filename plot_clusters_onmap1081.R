@@ -37,7 +37,6 @@ png(paste('Manuscript/', emmtype, 'thresh.png', sep='_'),
 ranScanPlotCluster(tmp.1081, case.df.tmp1, emmtype, threshold=0.95)
 dev.off()
 
-
 # idxx = (tmp[,1] < 9.5) & (tmp[,1] > 3.5)
 # idxy = (tmp[,2] < -3.5) & (tmp[,2] > -9.5)
 

@@ -135,7 +135,7 @@ plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, 
 #plotBaseMap(add=T, Wales=F)
 mtext('A', side=3, padj=2, at=1, cex=2)
 
-plot(df2$longitude, df2$latitude,axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic + epidemic')
+plot(df2$longitude, df2$latitude, axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic + epidemic')
 #plotBaseMap(add=T, Wales=F)
 mtext('B', side=3, padj=2, at=1, cex=2)
 
@@ -253,14 +253,19 @@ print(quantile(auc, c(0.025,0.5,0.975) ))
 
 
 ```{r}
-plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t', ylab=expression(italic(w)),
-     col=ifelse(case.df$true_positive, "#d62728", "#1f77b4"), pch=ifelse(case.df$true_positive, 20, 1))
-#png(paste0('Fig/ws_time_',label.str,'.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
+plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
+     ylab=expression(italic(w)),
+     col=ifelse(case.df$true_positive, "#d62728", "#1f77b4"),
+     pch=ifelse(case.df$true_positive, 20, 1))
+png(paste0('Fig/ws_time_',label.str,'.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
 par(mfrow=c(1,1), mar=c(4,4,1,1))
-plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t', ylab=expression(italic(w)),
-     col=ifelse(case.df$true_positive, "#d6272855", "#1f77b455"), pch=ifelse(case.df$true_positive, 20, 1))
-legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"), pch=c(20,1))
-#dev.off()
+plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
+     ylab=expression(italic(w)),
+     col=ifelse(case.df$true_positive, "#d6272855", "#1f77b455"),
+     pch=ifelse(case.df$true_positive, 20, 1))
+legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"),
+       pch=c(20,1))
+dev.off()
 ```
 
 
@@ -272,7 +277,35 @@ idx1 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (
 idx2 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score > 0.95)
 plot(case.df[idx1,]$longitude, case.df[idx1,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA)
 points(case.df[idx2,]$longitude, case.df[idx2,]$latitude, col='#d62728', pch=20, cex=1, ylab = NA, xlab=NA)
+
+
+
+######
+plot.circle<-function(x,y,r, add=F, plot=T,...){
+  t <- seq(0, 2*pi, length=100)
+  coords <- t(rbind(x+sin(t)*r, y+cos(t)*r))
+  if(plot){
+    if (add){
+      lines(coords, ...)    
+    }else{
+      plot(coords, ...)
+    }
+  }
+  return(coords)
+}
+png(paste0('Fig/satscan_',label.str,'.png'), width =  4 *1.2, height = 3 *1.2, units = 'in', res=400, pointsize = 17)
+par(mfrow = c(1, 1), mar=c(1,1,1,1)+0.1)
+plot(case.df$longitude, case.df$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA,  xlim=c(-0.65,0.3), ylim=c(51.4,51.8) )
+idx3=case.df$warning.score > 0.95
+points(case.df[idx3,]$longitude, case.df[idx3,]$latitude, col='#ff7f0e', pch=20, cex=1, ylab = NA, xlab=NA)
+points(case.df[case.df$true_positive,]$longitude, case.df[case.df$true_positive,]$latitude, col='#d62728', pch=4, cex=1, ylab = NA, xlab=NA)
 plotBaseMap(add=T, Wales = F)
+sim.col=st_read('Data/satscan_output.shp')
+plot(sim.col[1], add=T, col=NA, border='#7f7f7f')
+dev.off()
+#########
+
+
 
 png(paste0('Fig/end_epi_spatial_',label.str,'.png'), width =  4 *1.2, height = 3 *1.2, units = 'in', res=400, pointsize = 13)
 par(mfrow = c(1, 1), mar=c(1,1,1,1)+0.1)
@@ -288,16 +321,16 @@ dev.off()
 
 
 
-tab:blue : #1f77b4
-tab:orange : #ff7f0e
-tab:green : #2ca02c
-tab:red : #d62728
-tab:purple : #9467bd
-tab:brown : #8c564b
-tab:pink : #e377c2
-tab:gray : #7f7f7f
-tab:olive : #bcbd22
-tab:cyan : #17becf
+tab.blue = "#1f77b4"
+tab.orange = "#ff7f0e"
+tab.green = "#2ca02c"
+tab.red = "#d62728"
+tab.purple = "#9467bd"
+tab.brown = "#8c564b"
+tab.pink = "#e377c2"
+tab.gray = "#7f7f7f"
+tab.olive = "#bcbd22"
+tab.cyan = "#17becf"
 
 
 test timeliness
@@ -321,7 +354,7 @@ palette=inferno(len(40:59),begin=0.15, end=0.85, direction=-1)
 
 plot(c(40,59), range(case.df[case.df$true_positive,11:30]), col='white', xlab = expression(tau),
      ylab=expression(italic(w)), axes = FALSE)
-abline(h=0.95, col='#7f7f7f')
+#abline(h=0.95, col='#7f7f7f')
 
 for(i in 1:NROW(case.df[case.df$true_positive,  ])){
   t1 = case.df[case.df$true_positive,][i,'SAMPLE_DT_numeric']

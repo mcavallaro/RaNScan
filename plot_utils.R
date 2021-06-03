@@ -1,11 +1,5 @@
 library(sf)
 library(spatstat)
-A=st_read("shape_file_new/Areas.shp")
-
-plot_map<-function(X.range, Y.range, main=NULL){
-  plot(st_geometry(A), xlim=X.range, ylim = Y.range, axes=T, col='#e2e2e2', border='white', lwd=1, main=main)
-  box(lwd=0.1)
-}
 
 
 plot_cases<-function(observation.matrix, week.range, postcode.locations, col='#ffa500', cex=0.8, pch=NULL){
@@ -66,5 +60,18 @@ plot.emm.fraction<-function(case.df, emmtypes, legend.position='topright', ...){
 }
 
 
+
+plot.spaghetti<-function(prospective.w.df, spaghetti.col='black', ...){
+  cols = 16:NCOL(prospective.w.df)
+  x = 1:len(cols)
+  plot(range(x), c(0.5,1), type='n', xaxt='n', ...)
+  for (i in 1:2300){
+    if( !is.na(prospective.w.df[i,'x'])){
+      lines(x, unlist(prospective.w.df[i, cols]), col=spaghetti.col)
+    }
+  }
+  axis(side = 1, at = x, labels = colnames(prospective.w.df)[cols])
+  abline(h=0.95)
+}
 
 

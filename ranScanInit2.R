@@ -4,88 +4,106 @@ require(readxl)
 source("utils.R")
 case.file="Data/Full MOLIS dataset minus PII 20200918.xlsx"
 
+tab.blue = "#1f77b4"
+tab.orange = "#ff7f0e"
+tab.green = "#2ca02c"
+tab.red = "#d62728"
+tab.purple = "#9467bd"
+tab.brown = "#8c564b"
+tab.pink = "#e377c2"
+tab.gray = "#7f7f7f"
+tab.olive = "#bcbd22"
+tab.cyan = "#17becf"
+
+# "TF2 9AT"  "TA9 3AN"  "OL11 1JZ" "M9 8WA"   "WN5 0EH"  "TR14 0BH" "BN6 8HH"  "BN2 6WA"  "IP14 6DT"
+# [10] "BL5 2LU"  "CA28 7TN" "SK17 7AF" "NA"       "L39 4RS" 
+
 ranScanInit<-function(case.file){ #}, postcode.file=default.postcode.file){
     source("utils.R")
-    case.df = read_excel(case.file)
-    
-    case.df = as.data.frame(case.df)
-    
-    nomi = c("FULLNO", "Patient Postcode", "SAMPLE_DT", "RECEPT_DT", "Isolation Site Decoded", "Sterile Site Y N",
-             "emm gene type")
-    case.df = case.df[, nomi]
-    
-    case.df['emmtype'] = apply(case.df['emm gene type'], 1, FUN=split)
-    case.df['emmtype'] = apply(case.df['emmtype'], 1, FUN=function(x){strsplit(x, '\r')[[1]][1]})
-
-    idx = case.df$`Sterile Site Y N` == "#s"
-    idx2 = !is.na(case.df$`Sterile Site Y N`)
-    if (any(idx & idx2)){
-      case.df = case.df[idx & idx2, ]      
+    case.df<-tryCatch({
+      ""
+      load(paste0(case.file, ".Rdata"))
+      case.df
+    },
+    error = function(e){
+      ""
+      case.df = read_excel(case.file)
+      case.df = as.data.frame(case.df)
+      nomi = c("FULLNO", "Patient Postcode", "SAMPLE_DT", "RECEPT_DT", "Isolation Site Decoded", "Sterile Site Y N",
+               "emm gene type")
+      case.df = case.df[, nomi]
+      
+      case.df['emmtype'] = apply(case.df['emm gene type'], 1, FUN=split)
+      case.df['emmtype'] = apply(case.df['emmtype'], 1, FUN=function(x){strsplit(x, '\r')[[1]][1]})
+      
+      idx = case.df$`Sterile Site Y N` == "#s"
+      idx2 = !is.na(case.df$`Sterile Site Y N`)
+      if (any(idx & idx2)){
+        case.df = case.df[idx & idx2, ]      
+      }
+      
+      # Insert coordinates
+      # if(!is.null(postcode.file)){
+      #   postcode.data = read.csv(postcode.file, stringsAsFactors = F, header = T)
+      #   case.df[,c("latitude", "longitude")] = t(apply(case.df, 1, postcode.to.location, postcode.data))
+      # }else{
+      #   case.df[,c("latitude", "longitude")] = t(apply(case.df, 1, postcode.to.location2))
+      # }
+      # convert dates to integers
+      case.df$RECEPT_DT_numeric = as.integer(difftime(case.df$RECEPT_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "weeks"))
+      case.df$SAMPLE_DT_numeric = as.integer(difftime(case.df$SAMPLE_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "weeks"))
+      
+      # clean data  
+      idx = (!is.na(case.df$SAMPLE_DT_numeric)) & (!is.na(case.df$RECEPT_DT_numeric))
+      if (any(idx)){
+        case.df = case.df[idx,]      
+      }
+      
+      idx = (case.df$SAMPLE_DT_numeric >= 0) & (case.df$RECEPT_DT_numeric >= 0)
+      if (any(idx)){
+        case.df = case.df[idx,]      
+      }
+      
+      idx = case.df$SAMPLE_DT_numeric <= case.df$RECEPT_DT_numeric
+      if (any(idx)){
+        case.df = case.df[idx,]
+      }
+      
+      idx = is.na(case.df$emmtype)
+      case.df$emmtype[idx] = 'NA'      
+      
+      idx = is.na(case.df$`Patient Postcode`)
+      case.df$`Patient Postcode`[idx] = 'NA'      
+      
+      case.df$lag = case.df$SAMPLE_DT_numeric - case.df$RECEPT_DT_numeric
+      
+      case.df$is.england = apply(case.df, 1, postcode.in.england)
+      
+      idx = is.na(case.df$is.england)
+      if (any(idx)){
+        case.df[idx,]$`Patient Postcode`= "NA"
+        case.df[idx,]$is.england = TRUE
+      }
+      
+      case.df = case.df[case.df$is.england, ]
+      case.df$is.england = NULL
+      
+      mm=mean(case.df$lag)
+      sdt=sd(case.df$lag)
+      
+      idx = abs(case.df$lag) < mm + 3 * sdt
+      if(any(idx)){
+        case.df = case.df[idx,]      
+      }
+      
+      attribute_list = attributes(case.df)
+      attribute_list$emmtypes = unique(case.df$emmtype)
+      attributes(case.df) <- attribute_list
+      
+      save.and.tell("case.df", file=paste0(case.file,".Rdata"))
+      return(case.df)
     }
-
-    # Insert coordinates
-    # if(!is.null(postcode.file)){
-    #   postcode.data = read.csv(postcode.file, stringsAsFactors = F, header = T)
-    #   case.df[,c("latitude", "longitude")] = t(apply(case.df, 1, postcode.to.location, postcode.data))
-    # }else{
-    #   case.df[,c("latitude", "longitude")] = t(apply(case.df, 1, postcode.to.location2))
-    # }
-
-    # convert dates to integers
-    case.df$RECEPT_DT_numeric = as.integer(difftime(case.df$RECEPT_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "weeks"))
-    case.df$SAMPLE_DT_numeric = as.integer(difftime(case.df$SAMPLE_DT, as.POSIXct("2015-01-01 UTC", tz = "UTC"), units = "weeks"))
-    
-    # clean data  
-    idx = (!is.na(case.df$SAMPLE_DT_numeric)) & (!is.na(case.df$RECEPT_DT_numeric))
-    if (any(idx)){
-      case.df = case.df[idx,]      
-    }
-
-    idx = (case.df$SAMPLE_DT_numeric >= 0) & (case.df$RECEPT_DT_numeric >= 0)
-    if (any(idx)){
-      case.df = case.df[idx,]      
-    }
-    
-    idx = case.df$SAMPLE_DT_numeric <= case.df$RECEPT_DT_numeric
-    if (any(idx)){
-      case.df = case.df[idx,]
-    }
-
-    
-    idx = is.na(case.df$emmtype)
-    case.df$emmtype[idx] = 'NA'      
-
-    idx = is.na(case.df$`Patient Postcode`)
-    case.df$`Patient Postcode`[idx] = 'NA'      
-
-    case.df$lag = case.df$SAMPLE_DT_numeric - case.df$RECEPT_DT_numeric
-    
-    case.df$is.england = apply(case.df, 1, postcode.in.england)
-    
-    idx = is.na(case.df$is.england)
-    if (any(idx)){
-      case.df[idx,]$`Patient Postcode`= "NA"
-      case.df[idx,]$is.england = TRUE
-    }
-    
-    case.df = case.df[case.df$is.england, ]
-    case.df$is.england = NULL
-    
-    mm=mean(case.df$lag)
-    sdt=sd(case.df$lag)
-
-    idx = abs(case.df$lag) < mm + 3 * sdt
-    if(any(idx)){
-      case.df = case.df[idx,]      
-    }
-
-    attribute_list = attributes(case.df)
-    attribute_list$emmtypes = unique(case.df$emmtype)
-    attributes(case.df) <- attribute_list
-
-    save.and.tell("case.df", file=paste0(case.file,".Rdata"))
-    return(case.df)
-    #list(case.df=case.df, emmtypes=unique(case.df$emmtype)))
+    )
 }
 
 ranScanClean<-function(pattern){
@@ -109,7 +127,6 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes){
   )
   postcodes = unique(case.df$`Patient Postcode`)
   n.postcodes= length(postcodes)
-  print(n.postcodes)
   n.emmtypes = length(emmtypes)
   n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
   for (e in 1:n.emmtypes){
@@ -131,7 +148,10 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes){
       }
       observation.matrix[postcode, as.character(week)] = observation.matrix[postcode, as.character(week)] + 1
     }
-    print(dim(observation.matrix))
+    attribute_list = attributes(observation.matrix)
+    attribute_list$emmtype = emmtype
+    attributes(observation.matrix) <- attribute_list
+    
     save.and.tell("observation.matrix",
                   file=file.path(dirname(case.file), paste0(emmtype, '_obs.Rdata')))
   }
@@ -254,119 +274,110 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
   attributes(observation.matrices.untyped) <- attribute_list
   attribute_list = list(names = names(observation.matrices.typed),starting.week=starting.week, n.weeks=n.weeks, week.max=MAX)
   attributes(observation.matrices.typed) <- attribute_list
-  
-  # print(head(rownames(observation.matrices.untyped[[1]])))
-  # print(file.path(dirname(case.file), paste0('untyped', '_obs.Rdata')))
+
   save.and.tell("observation.matrices.untyped",
                 file=file.path(dirname(case.file), paste0('untyped', '_obs.Rdata')))
   save.and.tell("observation.matrices.typed",
                 file=file.path(dirname(case.file),paste0(c(emmtypes, '_typed_obs.Rdata'), collapse='')))
-  
-  # save("observation.matrices.untyped", file=file.path(dirname(case.file), paste0('untyped', '_obs.Rdata')))
-  # save("observation.matrices.typed", file=file.path(dirname(case.file), paste0(c(emmtypes, '_typed_obs.Rdata'), collapse='')))
-  # 
-  # cat("Observation matrices `observation.matrices.untyped` and `observation.matrices.typed` saved in files\n",
-  #     file.path(dirname(case.file), paste0('untyped', '_obs.Rdata')), "\nand\n",
-  #     file.path(dirname(case.file), paste0(c(emmtypes, '_typed_obs.Rdata'), collapse='')), 'respectively.\n')
 }
 
 
 ranScanCreateObservationMatrices.delay<-ranScanCreateObservationMatrices_
 
-ranScanCreateObservationMatrices.prospective<-function(case.file, emmtypes, n.weeks){
-  #' This is a simplified version of `ranScanCreateObservationMatrices.delay` that
-  #' create a sparse observation matrix only for the last (current) week.
-  #' This function rearranges the observation of `case.file` into observation Matrices
-  #' similarly to `ranScanCreateObservationMatrices` with the difference that it counts the cases that are not typed at "SAMPLE_DT" but only are at "RECEIPT_DT" datetimes.
-  #' It creates and saves in two `.Rdata` files:
-  #'  1) a matrix that contains the observations of untyped case.
-  #'  2) a list of matrices that contain the observations of the typed cases (one, for each emm type).
-  #'  
-  #' The matrices are spaved in sparse format requiring `library(Matrix)`.
-  #'  
-  #' @param case.file A string
-  #' @param emmtypes An vector of emmtypes.
-  #' @param n.weeks no. columns
-  #' @examples
-  #' ranScanCreateObservationMatrices.prospective(case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx", c('1.0', '12.0'), 100)
-  library(Matrix)
-  # emmtype is an vector of strings, e.g., 
-  case.df<-tryCatch({
-    load(paste0(case.file, ".Rdata"))
-    case.df
-  },
-  error = function(e){
-    case.df = ranScanInit(case.file)
-    return(case.df)
-  }
-  )
-  postcodes = unique(case.df$`Patient Postcode`)
-  n.postcodes= length(postcodes)
-  n.emmtypes = length(emmtypes)
-  MAX = max(c(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)], case.df$RECEPT_DT_numeric[!is.na(case.df$RECEPT_DT_numeric)]))
-
-  dimnames = list(postcodes, c(as.character( (week - n.weeks+1):(week) ) ))
-  observation.matrix.untyped = as(matrix(data=0,
-                                         nrow=n.postcodes,
-                                         ncol=n.weeks, 
-                                         dimnames=dimnames), "sparseMatrix")
-  ### continua da qui
-  observation.matrices.typed = list()
-  for (emmtype in emmtypes){
-    dimnames = list(postcodes, c(as.character( (week-n.weeks+1):(week) ) ))
-    observation.matrices.typed[[emmtype]] = as(matrix(data=0,
-                                                      nrow=n.postcodes,
-                                                      ncol=n.weeks,
-                                                      dimnames=dimnames), "sparseMatrix")
-  }
-  week = ???
-  # this is the week at week the scores are calculated
-  # fill the untyped observation.matrix with the cases that were detected by week "week"
-  # (SAMPLE_DT<week) but whose typing occurred after the same "week" (RECEIPT_DT>weel)
-  idx = (case.df$SAMPLE_DT_numeric > week - n.weeks + 1) &
-      (case.df$SAMPLE_DT_numeric <= week) &
-      (case.df$RECEPT_DT_numeric > week)
-  if (any(idx)){
-      case.df.idx = case.df[idx,]
-      for (i in 1:nrow(case.df.idx)){
-        postcode = case.df.idx[i, 'Patient Postcode']
-        week_ = case.df.idx[i, 'SAMPLE_DT_numeric']
-        observation.matrix.untyped[postcode, as.character(week_)] = 
-          observation.matrices.untyped[postcode, as.character(week_)] + 1
-      }
-  }
-    
-  for (emmtype in emmtypes){
-      # fill the typed observation.matrix with the cases that were detected and typed by week "week"
-      # (RECEIPT_DT<week)
-      idx = (case.df$emmtype == emmtype) &
-        (case.df$SAMPLE_DT_numeric > week - n.weeks + 1) &
-        (case.df$RECEPT_DT_numeric <= week) &
-        (case.df$SAMPLE_DT_numeric <= week)
-      if (any(idx)){
-        case.df.idx = case.df[idx,]
-        for (i in 1:nrow(case.df.idx)){
-          postcode = case.df.idx[i, 'Patient Postcode']
-          week_ = case.df.idx[i, 'SAMPLE_DT_numeric']
-          if (is.na(week_)){
-            week_ = 'NA'
-          }
-          observation.matrices.typed[[emmtype]][postcode, as.character(week_)] = 
-            observation.matrices.typed[[emmtype]][postcode, as.character(week_)] + 1
-        }
-      }
-  }
-  attribute_list = list(n.weeks = n.weeks, week.max = MAX)
-  attributes(observation.matrix.untyped) <- attribute_list
-  attribute_list = list(n.weeks = n.weeks, week.max = MAX)
-  attributes(observation.matrices.typed) <- attribute_list
-  
-  save.and.tell("observation.matrix.untyped",
-                file=file.path(dirname(case.file), paste0('untyped_prospective', '_obs.Rdata')))
-  save.and.tell("observation.matrices.typed",
-                file=file.path(dirname(case.file),paste0(c(emmtypes, '_typed_prospective_obs.Rdata'), collapse='')))
-}
-
+#' ranScanCreateObservationMatrices.prospective<-function(case.file, emmtypes, n.weeks){
+#'   #' This is a simplified version of `ranScanCreateObservationMatrices.delay` that
+#'   #' create a sparse observation matrix only for the last (current) week.
+#'   #' This function rearranges the observation of `case.file` into observation Matrices
+#'   #' similarly to `ranScanCreateObservationMatrices` with the difference that it counts the cases that are not typed at "SAMPLE_DT" but only are at "RECEIPT_DT" datetimes.
+#'   #' It creates and saves in two `.Rdata` files:
+#'   #'  1) a matrix that contains the observations of untyped case.
+#'   #'  2) a list of matrices that contain the observations of the typed cases (one, for each emm type).
+#'   #'  
+#'   #' The matrices are spaved in sparse format requiring `library(Matrix)`.
+#'   #'  
+#'   #' @param case.file A string
+#'   #' @param emmtypes An vector of emmtypes.
+#'   #' @param n.weeks no. columns
+#'   #' @examples
+#'   #' ranScanCreateObservationMatrices.prospective(case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx", c('1.0', '12.0'), 100)
+#'   library(Matrix)
+#'   # emmtype is an vector of strings, e.g., 
+#'   case.df<-tryCatch({
+#'     load(paste0(case.file, ".Rdata"))
+#'     case.df
+#'   },
+#'   error = function(e){
+#'     case.df = ranScanInit(case.file)
+#'     return(case.df)
+#'   }
+#'   )
+#'   postcodes = unique(case.df$`Patient Postcode`)
+#'   n.postcodes= length(postcodes)
+#'   n.emmtypes = length(emmtypes)
+#'   MAX = max(c(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)], case.df$RECEPT_DT_numeric[!is.na(case.df$RECEPT_DT_numeric)]))
+#' 
+#'   dimnames = list(postcodes, c(as.character( (week - n.weeks+1):(week) ) ))
+#'   observation.matrix.untyped = as(matrix(data=0,
+#'                                          nrow=n.postcodes,
+#'                                          ncol=n.weeks, 
+#'                                          dimnames=dimnames), "sparseMatrix")
+#'   ### continua da qui
+#'   observation.matrices.typed = list()
+#'   for (emmtype in emmtypes){
+#'     dimnames = list(postcodes, c(as.character( (week-n.weeks+1):(week) ) ))
+#'     observation.matrices.typed[[emmtype]] = as(matrix(data=0,
+#'                                                       nrow=n.postcodes,
+#'                                                       ncol=n.weeks,
+#'                                                       dimnames=dimnames), "sparseMatrix")
+#'   }
+#'   week = ???
+#'   # this is the week at week the scores are calculated
+#'   # fill the untyped observation.matrix with the cases that were detected by week "week"
+#'   # (SAMPLE_DT<week) but whose typing occurred after the same "week" (RECEIPT_DT>weel)
+#'   idx = (case.df$SAMPLE_DT_numeric > week - n.weeks + 1) &
+#'       (case.df$SAMPLE_DT_numeric <= week) &
+#'       (case.df$RECEPT_DT_numeric > week)
+#'   if (any(idx)){
+#'       case.df.idx = case.df[idx,]
+#'       for (i in 1:nrow(case.df.idx)){
+#'         postcode = case.df.idx[i, 'Patient Postcode']
+#'         week_ = case.df.idx[i, 'SAMPLE_DT_numeric']
+#'         observation.matrix.untyped[postcode, as.character(week_)] = 
+#'           observation.matrices.untyped[postcode, as.character(week_)] + 1
+#'       }
+#'   }
+#'     
+#'   for (emmtype in emmtypes){
+#'       # fill the typed observation.matrix with the cases that were detected and typed by week "week"
+#'       # (RECEIPT_DT<week)
+#'       idx = (case.df$emmtype == emmtype) &
+#'         (case.df$SAMPLE_DT_numeric > week - n.weeks + 1) &
+#'         (case.df$RECEPT_DT_numeric <= week) &
+#'         (case.df$SAMPLE_DT_numeric <= week)
+#'       if (any(idx)){
+#'         case.df.idx = case.df[idx,]
+#'         for (i in 1:nrow(case.df.idx)){
+#'           postcode = case.df.idx[i, 'Patient Postcode']
+#'           week_ = case.df.idx[i, 'SAMPLE_DT_numeric']
+#'           if (is.na(week_)){
+#'             week_ = 'NA'
+#'           }
+#'           observation.matrices.typed[[emmtype]][postcode, as.character(week_)] = 
+#'             observation.matrices.typed[[emmtype]][postcode, as.character(week_)] + 1
+#'         }
+#'       }
+#'   }
+#'   attribute_list = list(n.weeks = n.weeks, week.max = MAX)
+#'   attributes(observation.matrix.untyped) <- attribute_list
+#'   attribute_list = list(n.weeks = n.weeks, week.max = MAX)
+#'   attributes(observation.matrices.typed) <- attribute_list
+#'   
+#'   save.and.tell("observation.matrix.untyped",
+#'                 file=file.path(dirname(case.file), paste0('untyped_prospective', '_obs.Rdata')))
+#'   save.and.tell("observation.matrices.typed",
+#'                 file=file.path(dirname(case.file),paste0(c(emmtypes, '_typed_prospective_obs.Rdata'), collapse='')))
+#' }
+#' 
 
 ranScanPostcodeMap<-function(observation.matrix, postcode.file.name=postcode.file){
   # Create a dataframe that maps postcodes to coordinates
@@ -433,7 +444,6 @@ ranScanTimeFactor<-function(case.file, parameters=NULL){
   return(time.factor)
 }
 
-
 ranScanEmmtypeFactor<-function(case.file){
   load(paste0(case.file, ".Rdata"))
   emmtype.factor = c(table(case.df$emmtype))
@@ -465,11 +475,14 @@ ranScanEmmtypeFactor.tau<-function(case.file, emmtypes){
   return(xy.list)
 }
 
+
+
+#' At a given week, a fraction lambda_untyped \approx 0.6 of all cases are not typed.
+#' the baselines e.g. are as follows:
+#' - for the emmtype 33.0: (1-lambda_untyped) * lambda_33.0 * lambda_t * lambda_geo
+#' - for the entyped: lambda_untyped * lambda_t * lambda_geo
+#' 
 ranScanEmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
-  # At a given week, a fraction lambda_untyped \approx 0.6 of all cases are not typed.
-  # the baselines e.g. are as follows:
-  # - for the emmtype 33.0: (1-lambda_untyped) * lambda_33.0 * lambda_t * lambda_geo
-  # - for the entyped: lambda_untyped * lambda_t * lambda_geo
   if (starting.week < n.weeks){
     starting.week = n.weeks
     cat(sprintf("We enforced `starting.week=n.week=%d`", n.weeks), ".\n")
@@ -491,7 +504,7 @@ ranScanEmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
       tmp[i] = tmp[i] + sum(idx1 & idx2) / sum(idx1)
     }
   }
-  tmp = tmp / len(starting.week:MAX) # (MAX - starting.week + 1)
+  tmp = tmp / length(starting.week:MAX) # (MAX - starting.week + 1)
   # cum.tmp = cumsum(tmp) / 1:length(tmp)
   # for (i in 1:n.weeks){
   #   if (is.na(cum.tmp[i])){
