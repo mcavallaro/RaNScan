@@ -67,11 +67,102 @@ plot.spaghetti<-function(prospective.w.df, spaghetti.col='black', ...){
   plot(range(x), c(0.5,1), type='n', xaxt='n', ...)
   for (i in 1:2300){
     if( !is.na(prospective.w.df[i,'x'])){
-      lines(x, unlist(prospective.w.df[i, cols]), col=spaghetti.col)
+      y = unlist(prospective.w.df[i, cols])
+      idx = which(y>0)
+      
+      lines(x[idx], y[idx], col=spaghetti.col)
+      
     }
   }
   axis(side = 1, at = x, labels = colnames(prospective.w.df)[cols])
   abline(h=0.95)
+}
+
+plot.strategy.compare<-function(n.rows, prospective.w.df1, prospective.w.df2,
+                                col1, col2, 
+                                label1, label2, threshold=0.95, first.row=1, ...){
+  ncol1 = NCOL(prospective.w.df1)
+  ncol2 = NCOL(prospective.w.df2)
+  cols = 16:ncol1
+  
+  ROW.NAMES = intersect(row.names(prospective.w.df1), row.names(prospective.w.df2))
+  prospective.w.df1 = prospective.w.df1[ROW.NAMES,]
+  prospective.w.df2 = prospective.w.df2[ROW.NAMES,]
+  Idx = which(prospective.w.df1[, NCOL(prospective.w.df1)] > threshold)  
+  x.labels = intersect(colnames(prospective.w.df1), colnames(prospective.w.df2))
+
+  # remove the first 17 common columns
+  x.labels = x.labels[-(1:17)]
+  Len = length(x.labels)
+  writeLines(sprintf("Max time steps is %d.", Len))
+  x = 1:Len
+  
+  for (i in first.row:(first.row+n.rows)){
+    if( !is.na(prospective.w.df1[i,'x']) & i %in% Idx){
+      title = sprintf("%s %s - sampled on %d - typed on %d", prospective.w.df1[i,'Patient Postcode'], prospective.w.df1[i,'FULLNO'], prospective.w.df1[i,'SAMPLE_DT_numeric'], prospective.w.df1[i,'RECEPT_DT_numeric'] )
+      plot(range(x), c(0,1), type = 'n', xaxt = 'n', main = title, ylab = expression(italic(w)),...)
+      
+      y = unlist(prospective.w.df1[i, x.labels])
+      idx = which(y>0)
+      lines(x[idx], y[idx], col = col1, lty=1)
+      points(x[idx], y[idx], col = col1, pch=1)
+      
+      y = unlist(prospective.w.df2[i, x.labels])
+      idx = which(y>0)
+      lines(x[idx], y[idx], col = col2, lty=3)
+      points(x[idx], y[idx], col = col2, pch=4)
+      
+      abline(h=0.95, col=tab.gray)
+
+      legend("bottomright", legend = c(label1, label2), col = c(col1, col2), lty = c(1,3), pch=c(1,4))
+      axis(side = 1, at = x, labels = x.labels)
+    }
+  }
+}
+
+
+
+plot.delay.compare<-function(n.rows, prospective.w.df1, delay.w.df2,
+                                col1, col2, 
+                                label1, label2, threshold=0.95, first.row=1, ...){
+  ncol1 = NCOL(prospective.w.df1)
+  ncol2 = NCOL(delay.w.df2)
+  cols = 16:ncol1
+  
+  ROW.NAMES = intersect(row.names(prospective.w.df1), row.names(delay.w.df2))
+  prospective.w.df1 = prospective.w.df1[ROW.NAMES,]
+  delay.w.df2 = delay.w.df2[ROW.NAMES,]
+  Idx = which(prospective.w.df1[, NCOL(prospective.w.df1)] > threshold)  
+  x.labels = intersect(colnames(prospective.w.df1), colnames(delay.w.df2))
+  
+  # remove the first 17 common columns
+  x.labels = x.labels[-(1:17)]
+  Len = length(x.labels)
+  writeLines(sprintf("Max time steps is %d.", Len))
+  x = 1:Len
+  
+  for (i in first.row:(first.row+n.rows)){
+    if( !is.na(prospective.w.df1[i,'x']) & i %in% Idx){
+      title = sprintf("sampled %d - typed on %d", prospective.w.df1[i,'SAMPLE_DT_numeric'], prospective.w.df1[i,'RECEPT_DT_numeric'] )
+      plot(range(x), c(0,1), type = 'n', xaxt = 'Diagnosis date',
+           main = title, ylab = expression(italic(w)),...)
+      
+      y = unlist(prospective.w.df1[i, x.labels])
+      idx = which(y>0)
+      lines(x[idx], y[idx], col = col1, lty=1)
+      points(x[idx], y[idx], col = col1, pch=1)
+      
+      y = unlist(delay.w.df2[i, x.labels])
+      idx = which(y>0)
+      lines(x[idx], y[idx], col = col2, lty=3)
+      points(x[idx], y[idx], col = col2, pch=4)
+      
+      abline(h=0.95, col=tab.gray)
+      
+      legend("bottomright", legend = c(label1, label2), col = c(col1, col2), lty = c(1,3), pch=c(1,4))
+      axis(side = 1, at = x, labels = x.labels)
+    }
+  }
 }
 
 

@@ -199,60 +199,17 @@ warning_ratio2<-function(i, observation.matrix, t, cylinders, postcode.locations
   }
 }
 
-# warning_ratio2<-function(i, observation.matrix, t, cylinders, postcode.locations){
-#   times = which(observation.matrix > 0)
-#   if (length(times) > 0){
-#     # check if the location is in any circle
-#     # check if the location 
-#     x = as.numeric(case['longitude'])
-#     y = as.numeric(case['latitude'])
-#     TT = as.numeric(case['SAMPLE_DT_numeric'])
-#     
-#     in_circle = apply(cylinders, 1, function(X){
-#       ifelse(sqrt((as.numeric(X['x']) - x)^2 + (as.numeric(X['y']) - y)^2) < as.numeric(X['rho']), 1, 0)
-#     })
-#     in_cylinder_height = apply(cylinders, 1,  function(X){
-#           ifelse((as.numeric(X['t.low']) < TT) & (as.numeric(X['t.upp']) > TT), 1, 0)
-#         })
-#     # number of cylinders that include geo-coordinate of `case`
-#     in_cylinder = sum(in_circle * in_cylinder_height, na.rm=T)
-#     in_cylinder = sum(in_cylinder, na.rm = T)
-#     
-#     # number of cylinder with `warning` flag that include location `i`
-#     warning = sum(cylinders$warning * in_circle * in_cylinder_height,na.rm=T)
-#     if (in_cylinder>0){
-#       re = warning / in_cylinder
-#     }else{
-#       re = 0
-#     } 
-#     return(re)
-# }
-#
 
-warning.score<-function(case, cylinders){
-  # check if the location 
+warning.score<-function(case, cylinders, date.time.field = 'SAMPLE_DT_numeric'){
   x = as.numeric(case['x'])
   y = as.numeric(case['y'])
-  TT = as.numeric(case['SAMPLE_DT_numeric'])
+  TT = as.numeric(case[date.time.field])
   
-  ## da vettorizzare
-  # in_circle = apply(cylinders, 1, function(X){
-  #   ifelse(sqrt((as.numeric(X['x']) - x)^2 + (as.numeric(X['y']) - y)^2) < as.numeric(X['rho']), 1, 0)
-  # })
-  
-  # vettorizzato
   d = sqrt((cylinders$x - x)^2 + (cylinders$y - y)^2)
   in_circle = as.integer(d <= cylinders$rho)
-  
-  ## da vettorizzare
-  # in_cylinder_height = apply(cylinders, 1,  function(X){
-  #   ifelse((as.numeric(X['t.low']) < TT) & (as.numeric(X['t.upp']) > TT), 1, 0)
-  # })
-  
-  # vettorizzato
   in_cylinder_height = as.integer((cylinders$t.low <= TT) & (cylinders$t.upp >= TT))
   
-  # # number of cylinders that include geo-coordinate of `case`
+  # number of cylinders that include geo-coordinate of `case`
   in_cylinder = sum(in_circle * in_cylinder_height, na.rm=T)
 
   # number of cylinder with `warning` flag that include location `i`

@@ -113,7 +113,7 @@ ranScanClean<-function(pattern){
   }
 }
 
-ranScanCreateObservationMatrices<-function(case.file, emmtypes){
+ranScanCreateObservationMatrices<-function(case.file, emmtypes, date.time.field = 'SAMPLE_DT_numeric'){
   # emmtype is an vector of strings, e.g., 
   library(Matrix)
   case.df<-tryCatch({
@@ -128,7 +128,9 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes){
   postcodes = unique(case.df$`Patient Postcode`)
   n.postcodes= length(postcodes)
   n.emmtypes = length(emmtypes)
-  n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
+  
+  
+  n.weeks = max(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) - min(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) + 1
   for (e in 1:n.emmtypes){
     emmtype=emmtypes[e]
     cat("Step ",e, " of ", n.emmtypes, ", creating matrix for", emmtype, "emm type\n")
@@ -142,7 +144,7 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes){
     for (i in 1:nrow(case.df.idx)){
 #      emmtype = case.df[i,'emmtype']
       postcode = case.df.idx[i,'Patient Postcode']
-      week = case.df.idx[i, 'SAMPLE_DT_numeric']
+      week = case.df.idx[i, date.time.field]
       if (is.na(week)){
         week = 'NA'
       }
@@ -150,6 +152,7 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes){
     }
     attribute_list = attributes(observation.matrix)
     attribute_list$emmtype = emmtype
+    attribute_list$date.time.field = date.time.field
     attributes(observation.matrix) <- attribute_list
     
     save.and.tell("observation.matrix",
@@ -195,9 +198,7 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
     return(case.df)
   }
   )
-  # print(sum(case.df$RECEPT_DT_numeric == case.df$SAMPLE_DT_numeric)) #=0
-  # print(sum(case.df$RECEPT_DT_numeric < case.df$SAMPLE_DT_numeric)) #=0
-  # print(sum(case.df$RECEPT_DT_numeric > case.df$SAMPLE_DT_numeric)) #>0
+
   postcodes = unique(case.df$`Patient Postcode`)
   # emmtypes = unique(case.df$emmtype)
   n.postcodes= length(postcodes)
@@ -409,7 +410,7 @@ ranScanPostcodeMap<-function(observation.matrix, postcode.file.name=postcode.fil
   return(ret)
 }
 
-ranScanTimeFactor<-function(case.file, parameters=NULL){
+ranScanTimeFactor<-function(case.file, save.on.disk = TRUE, date.time.field = "SAMPLE_DT_numeric", parameters = NULL){
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
     case.df
@@ -420,6 +421,9 @@ ranScanTimeFactor<-function(case.file, parameters=NULL){
   }
   )
   time.factor<-tryCatch({
+    if(save.on.disk == FALSE){
+      stop("Not loading from disk.")
+    }
     load(paste0(case.file, "_timefactor.Rdata"))
     cat("Temporal baseline loaded.\n")
     time.factor
@@ -427,20 +431,23 @@ ranScanTimeFactor<-function(case.file, parameters=NULL){
   error = function(e){
     cat("Computing the temporal baseline.\n")
     source("time_utils.R")
-    Parameters = cmle(case.df$SAMPLE_DT_numeric, 50, parameters)
-    n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
+    Parameters = cmle(case.df[,date.time.field], 20, parameters)
+    n.weeks = max(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) - min(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) + 1
     x = 0:n.weeks
     prediction.cmle = predict.cmle(x, Parameters)
     
-    na = sum(is.na(case.df$SAMPLE_DT_numeric))
+    na = sum(is.na(case.df[,date.time.field]))
     
     time.factor = c(na, prediction.cmle)
     names(time.factor) = c('NA', x)
-    save.and.tell('time.factor', file=paste0(case.file, "_timefactor.Rdata"))
-    
+    attr=attributes(time.factor)
+    attr$Parameters = Parameters
+    attributes(time.factor) = attr
+    if(save.on.disk){
+      save.and.tell('time.factor', file=paste0(case.file, "_timefactor.Rdata"))
+    }
     return(time.factor)
-  }
-  )
+  })
   return(time.factor)
 }
 
@@ -456,9 +463,9 @@ ranScanEmmtypeFactor<-function(case.file){
   return(xy.list)
 }
 
-ranScanEmmtypeFactor.tau<-function(case.file, emmtypes){
+ranScanEmmtypeFactor.tau<-function(case.file, emmtypes, date.time.field = 'SAMPLE_DT_numeric'){
   load(paste0(case.file, ".Rdata"))
-  n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
+  n.weeks = max(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) - min(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) + 1
 
   xy.list=list()
   
@@ -472,10 +479,9 @@ ranScanEmmtypeFactor.tau<-function(case.file, emmtypes){
     names(tmp) = as.character(1:n.weeks)
     xy.list[[emmtype]]=tmp
   }
+
   return(xy.list)
 }
-
-
 
 #' At a given week, a fraction lambda_untyped \approx 0.6 of all cases are not typed.
 #' the baselines e.g. are as follows:
@@ -515,7 +521,7 @@ ranScanEmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
   return(tmp)
 }
 
-ranScanCreateBaselineMatrix<-function(case.file){
+ranScanCreateBaselineMatrix<-function(case.file, save.on.disk=FALSE, date.time.field='SAMPLE_DT_numeric'){
   
   # emmtype is an vector of strings, e.g., 
   case.df<-tryCatch({
@@ -530,14 +536,16 @@ ranScanCreateBaselineMatrix<-function(case.file){
   
   postcodes = unique(case.df$`Patient Postcode`)
   n.postcodes= length(postcodes)
-  n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
+  
+  n.weeks = max(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) - min(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) + 1
+#  n.weeks = max(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) - min(case.df$SAMPLE_DT_numeric[!is.na(case.df$SAMPLE_DT_numeric)]) + 1
   
   baseline.matrix = matrix(data=0,
                               nrow = n.postcodes,
                               ncol = n.weeks + 2,
                               dimnames=list(postcodes, c('NA', as.character(0:n.weeks))))
 
-  time.factor = ranScanTimeFactor(case.file)
+  time.factor = ranScanTimeFactor(case.file, save.on.disk, date.time.field)
   spatial.factor = ranScanPostcodeMap(matrix(data=0,
                                              nrow = n.postcodes,
                                              ncol = n.weeks + 2,
@@ -548,7 +556,15 @@ ranScanCreateBaselineMatrix<-function(case.file){
     }
   }
   baseline.matrix = baseline.matrix / sum(spatial.factor, na.rm = T)
-  save.and.tell("baseline.matrix", file=paste0(case.file, "_bas.Rdata"))
+  
+  
+  attribute_list = attributes(baseline.matrix)
+  attribute_list$date.time.field = date.time.field
+  attributes(baseline.matrix) <- attribute_list
+  
+  if(save.on.disk){
+    save.and.tell("baseline.matrix", file=paste0(case.file, "_bas.Rdata"))    
+  }
   return(baseline.matrix)
 }
 

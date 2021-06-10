@@ -191,33 +191,32 @@ dly.factor = delay.factor
   
 for (week in weeks){
   writeLines(week)
-  obs.matrix.untyped = observation.matrices.untyped[[week]]
-  obs.matrix.typed = observation.matrices.typed[[emmtype]][[week]]
-  obs.matrix = obs.matrix.typed + obs.matrix.untyped * emmtype.factor[[emmtype]][week]
   
-  cols = colnames(obs.matrix.typed)
+  cols = colnames(observation.matrices.untyped[[week]])
   emt.factor = emmtype.factor[[emmtype]][cols]
+  
+  obs.matrix.typed = observation.matrices.typed[[emmtype]][[week]]
+  obs.matrix.untyped = observation.matrices.untyped[[week]] * rep(emt.factor,
+                                                                  rep(NROW(observation.matrices.untyped[[week]]),
+                                                                      NCOL(observation.matrices.untyped[[week]])))
+  obs.matrix = obs.matrix.typed + obs.matrix.untyped
 
-  # moltiplicazione columnwise
-  bsl.matrix.typed = baseline.matrix[,cols] * rep((1 - dly.factor)*emt.factor,
+  bsl.matrix.typed = baseline.matrix[,cols] * rep((1 - dly.factor) * emt.factor,
                                                   rep(NROW(baseline.matrix[,cols]),
                                                       NCOL(baseline.matrix[,cols])))
-  bsl.matrix.untyped = baseline.matrix[,cols] * rep(dly.factor,
+  bsl.matrix.untyped = baseline.matrix[,cols] * rep(dly.factor * emt.factor,
                                                      rep(NROW(baseline.matrix[,cols]),
                                                          NCOL(baseline.matrix[,cols])))
-
-  bsl.matrix = bsl.matrix.typed + bsl.matrix.untyped * emmtype.factor[[emmtype]][week]
+  bsl.matrix = bsl.matrix.typed + bsl.matrix.untyped
+  
   week.range = range(as.integer(cols))
-
   cylinders.strategy1 = ranScanCreateCylinders.delay(obs.matrix.typed, bsl.matrix.typed,
                                            obs.matrix.untyped, bsl.matrix.untyped,
                                            emmtype, week.range,
                                            n_cyl, postcode2coord, size_factor = sizefactor)
-  
   cylinders.strategy2 = ranScanCreateCylinders(obs.matrix, bsl.matrix,
                                      emmtype, week.range,
                                      n_cyl, postcode2coord, size_factor = sizefactor)
-  
   case.df.tmp = ranScanEvaluate(case.file, cylinders.strategy1, emmtype, p.val.threshold=0.05)
   ws = case.df.tmp[case.df.tmp$emmtype == emmtype,]$warning.score
   i = as.integer(week) - as.integer(weeks[1]) + 1
@@ -226,8 +225,7 @@ for (week in weeks){
   case.df.tmp = ranScanEvaluate(case.file, cylinders.strategy2, emmtype, p.val.threshold=0.05)
   ws = case.df.tmp[case.df.tmp$emmtype == emmtype,]$warning.score
   i = as.integer(week) - as.integer(weeks[1]) + 1
-  to.export.strategy2[, i] = ws  
-  
+  to.export.strategy2[, i] = ws
 }
 ```
 
@@ -244,13 +242,99 @@ rm(dataframe.to.export)
 
 
 ```{r}
-strategy1_delay = read.csv(paste0('emmtype_', emmtype, '__strategy1_delay.csv'),
+strategy1_delay = read.csv(paste0('emmtype_', emmtype, '___strategy1_delay.csv'),
                                          row.names = 1, check.names = F)
 plot.spaghetti(strategy1_delay)
-strategy2_delay = read.csv(paste0('emmtype_', emmtype, '__strategy2_delay.csv'),
+strategy2_delay = read.csv(paste0('emmtype_', emmtype, '___strategy2_delay.csv'),
                                          row.names = 1, check.names = F)
 plot.spaghetti(strategy2_delay)
 ```
+
+
+```{r}
+plot.strategy.compare(115, strategy1_delay, strategy2_delay,
+                      tab.orange, tab.blue, "strategy 1", "strategy 2", xlim=c(50,142))
+```
+
+
+
+```{r}
+no.delay = read.csv(paste0('emmtype_', emmtype, '___no_delay_receipt.csv'), row.names = 1, check.names = F)
+plot.strategy.compare(115, strategy1_delay, no.delay,
+                      tab.orange, tab.blue, "with delay", "naive", xlim=c(50,142))
+
+
+```
+
+```{r}
+plot.strategy.compare(500, strategy1_delay, no.delay,
+                      tab.orange, tab.blue, "with delay", "naive", xlim=c(50,110), ylim=c(0.6,1)) #h191320275, h191440186,h191480689
+```
+
+```{r}
+plot.strategy.compare(4, strategy2_delay, no.delay,
+                      tab.orange, tab.blue, "with delay", "naive", xlim=c(1,142), threshold = 0, first.row = 64)
+```
+
+
+# figure
+
+```{r}
+png(paste0('Fig/strategy_comparison.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=600, pointsize = 11)
+par(mfrow=c(1,1), mar=c(4,4,1,1))
+s1 = strategy1_delay[which(strategy1_delay$FULLNO=='H191320275'),]
+s2 = strategy2_delay[which(strategy2_delay$FULLNO=='H191320275'),]
+s3 = no.delay[which(no.delay$FULLNO=='H191320275'),]
+x = intersect(intersect(colnames(s1), colnames(s2)), colnames(s3))
+x = x[-(1:16)]
+plot(c(1,length(x)), range(c(s1[x],s2[x],s3[x])),
+     xlab='', ylab='w', type = 'n', xlim=c(71,80)-1, ylim=c(0.4,1), xaxt='n',  cex=0.6)
+cat(sprintf("Sampled on %s - typed on %s", week2Date(s1$SAMPLE_DT_numeric), week2Date(s1$RECEPT_DT_numeric) ))
+abline(h=0.95, col=tab.gray)
+axis(side = 1, at = seq(1,length(x),2), labels = x[seq(1,length(x),2)], cex.axis=0.8, las=1, tck=-0.07)
+axis(side = 1, at = seq(2,length(x),2), labels = x[seq(2,length(x),2)], cex.axis=0.8, las=1,  padj=-1.5)
+
+idx = s1[x] > 0
+lines((1:length(x))[idx],s1[x][idx], col=tab.blue, lty=1)
+points((1:length(x))[idx],s1[x][idx], col=tab.blue, pch=1)
+idx = s2[x] > 0
+lines((1:length(x))[idx],s2[x][idx], col=tab.orange, lty=2)
+points((1:length(x))[idx],s2[x][idx], col=tab.orange, pch=2)
+idx = s3[x] > 0
+lines((1:length(x))[idx],s3[x][idx], col=tab.green, lty=3)
+points((1:length(x))[idx],s3[x][idx], col=tab.green, pch=3)
+legend("bottomright", c("Strategy 1", "Strategy 2", "Naive"),
+       lty=c(1,2,3), pch=c(1,2,3), col=c(tab.blue, tab.orange, tab.green))
+dev.off()
+
+png(paste0('Fig/strategy_comparison_2.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=600, pointsize = 11)
+par(mfrow=c(1,1), mar=c(4,4,1,1))
+s1 = strategy1_delay[which(strategy1_delay$FULLNO=='H191480689'),]
+s2 = strategy2_delay[which(strategy2_delay$FULLNO=='H191480689'),]
+s3 = no.delay[which(no.delay$FULLNO=='H191480689'),]
+x = intersect(intersect(colnames(s1), colnames(s2)), colnames(s3))
+x = x[-(1:16)]
+plot(c(1,length(x)), range(c(s1[x],s2[x],s3[x])),
+     xlab='', ylab='w', type = 'n', xlim=c(71,80), ylim=c(0.6,1), xaxt='n',  cex=0.6)
+cat(sprintf("Sampled on %s - typed on %s", week2Date(s1$SAMPLE_DT_numeric), week2Date(s1$RECEPT_DT_numeric) ))
+abline(h=0.95, col=tab.gray)
+axis(side = 1, at = seq(1,length(x),2), labels = x[seq(1,length(x),2)], cex.axis=0.8, las=1, tck=-0.07)
+axis(side = 1, at = seq(2,length(x),2), labels = x[seq(2,length(x),2)], cex.axis=0.8, las=1,  padj=-1.5)
+
+idx = s1[x] > 0
+lines((1:length(x))[idx],s1[x][idx], col=tab.blue, lty=1)
+points((1:length(x))[idx],s1[x][idx], col=tab.blue, pch=1)
+idx = s2[x] > 0
+lines((1:length(x))[idx],s2[x][idx], col=tab.orange, lty=2)
+points((1:length(x))[idx],s2[x][idx], col=tab.orange, pch=2)
+idx = s3[x] > 0
+lines((1:length(x))[idx],s3[x][idx], col=tab.green, lty=3)
+points((1:length(x))[idx],s3[x][idx], col=tab.green, pch=3)
+legend("bottomright", c("Strategy 1", "Strategy 2", "Naive"),
+       lty=c(1,2,3), pch=c(1,2,3), col=c(tab.blue, tab.orange, tab.green))
+dev.off()
+```
+
 
 
 # comparison delay vs no-delay

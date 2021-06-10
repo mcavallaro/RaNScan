@@ -26,7 +26,7 @@ source("plot_utils.R")
 #' @param p.val.threshold
 ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
                                  week.range, n.cylinders=1000, rs=0.1,
-                                 p.val.threshold=0.05, coord.df=postcode2coord,  size_factor=1){
+                                 p.val.threshold=0.05, coord.df=postcode2coord, size_factor=1){
   observation.matrix = observation.matrix[!(rownames(observation.matrix) == 'NA'),]
   baseline.matrix = baseline.matrix[!(rownames(baseline.matrix) == 'NA'),]
   
@@ -72,14 +72,13 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
     ## da vettorizzare:
     # cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < p.val.threshold) & (x['n_obs'] > 0), TRUE, FALSE)})
     # vettorizzato:
-    cylinders$warning = cylinders['p.val'] < p.val.threshold
+    cylinders$warning = cylinders$p.val < p.val.threshold
   }else{
     cat("No cases in the selected week range.\n")
   }
   print(Sys.time() - init)
   return(cylinders)
 }
-
 
 
 #' 
@@ -96,7 +95,7 @@ ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix
                                  emmtype,
                                  week.range, n.cylinders=1000, rs=0.1,
                                  p.val.threshold=0.05, coord.df=postcode2coord,  size_factor=1){
-  observation.matrix.typed= as.matrix(observation.matrix.typed[!(rownames(observation.matrix.typed) == 'NA'),])
+  observation.matrix.typed = as.matrix(observation.matrix.typed[!(rownames(observation.matrix.typed) == 'NA'),])
   baseline.matrix.typed = as.matrix(baseline.matrix.typed[!(rownames(baseline.matrix.typed) == 'NA'),])
   observation.matrix.untyped = as.matrix(observation.matrix.untyped[!(rownames(observation.matrix.untyped) == 'NA'),])
   baseline.matrix.untyped = as.matrix(baseline.matrix.untyped[!(rownames(baseline.matrix.untyped) == 'NA'),])
@@ -121,7 +120,7 @@ ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix
     A = sprintf("%d-%d", week.range[1], week.range[2])
     B = range(as.integer(colnames(observation.matrix.typed)))
     B = sprintf("%d-%d", B[1], B[2])
-    writeLines(paste0("Error: `week.range`` is ", A, ", while the range of `observation.matrix` is ", B, "." ))
+    writeLines(paste0("Error: `week.range` is ", A, ", while the range of `observation.matrix` is ", B, "." ))
     return(NA)
   }
   # weeks = as.integer(colnames(observation.matrix)[-seq(1:(starting.week+2))])
@@ -133,11 +132,9 @@ ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix
       " to ",
       as.character(week2Date(week.range[2])),        
       " for emm type ", emmtype, ".\n")
-  
+
   # generate cylinders
   cylinders.typed = rcylinder2(n.cylinders, observation.matrix.typed, week.range, radia_and_heights, coord.km.df)
-#  cylinders.untyped = rcylinder2((1 - p) * n.cylinders, observation.matrix.untyped, week.range, radia_and_heights, coord.km.df)
-  
   if (NROW(cylinders.typed) > 0){
     cylinders.typed[,c('n_obs.typed', 'mu.typed', 'p.val.typed')] = t(apply(cylinders.typed, 1, compute,
                                                                 observation.matrix.typed,
@@ -171,8 +168,8 @@ ranScanSaveCylinders<-function(cylinders, file.basename){
   save.and.tell("cylinders", file = paste0(file.basename,'.Rdata'))
 }
 
-ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold=0.05,
-                          warning.score.name='warning.score'){
+ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold = 0.05,
+                          warning.score.name = 'warning.score', date.time.field = 'SAMPLE_DT_numeric'){
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
     case.df
@@ -192,7 +189,7 @@ ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold=0.05,
   }
   idx = case.df$emmtype == emmtype
   writeLines(paste0("Computing warning scores for emmtype ", emmtype, "..."))
-  case.df[idx,warning.score.name] = apply(case.df[idx,], 1, FUN=warning.score, cylinders)
+  case.df[idx, warning.score.name] = apply(case.df[idx,], 1, FUN=warning.score, cylinders, date.time.field)
   writeLines("...Done.")
   return(case.df)  
 }

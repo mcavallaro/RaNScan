@@ -2,7 +2,11 @@
 emmtype = '12.0'
 
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
+
+ranScanCreateObservationMatrices(case.file, emmtype, date.time.field = 'SAMPLE_DT_numeric')
+#ranScanCreateObservationMatrices(case.file, emmtype, date.time.field = 'RECEPT_DT_numeric')
 load(paste0("~/Outbreak/Data/", emmtype, "_obs.Rdata"))
+
 baseline.matrix = ranScanCreateBaselineMatrix(case.file)
 emmtype.factor = ranScanEmmtypeFactor(case.file)
 
