@@ -1,14 +1,20 @@
-
+source('ranScanInit2.R')
+source('ranScanEvaluate.R')
+source("plotBaseMap.r")
 emmtype = '33.0'
 
-
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
+ranScanCreateObservationMatrices(case.file, emmtype, date.time.field = 'SAMPLE_DT_numeric')
+#ranScanCreateObservationMatrices(case.file, emmtype, date.time.field = 'RECEPT_DT_numeric')
 load(paste0("~/Outbreak/Data/", emmtype, "_obs.Rdata"))
 baseline.matrix = ranScanCreateBaselineMatrix(case.file)
 emmtype.factor = ranScanEmmtypeFactor(case.file)
 
+postcode2coord = ranScanPostcodeMap(observation.matrix)
+
+sizefactor=1.2
 n_cyl = 20000
-week.range = c(1, 298)
+week.range = c(0, 293)
 
 set.seed(1)
 cylinders.33 = ranScanCreateCylinders(observation.matrix,
@@ -22,23 +28,21 @@ case.df.tmp1 = case.df.tmp.33[idx, ]
 
 set.seed(1); tmp.33 = ranScanCluster(case.df.tmp1, emmtype)
 
-png(paste('Manuscript/', emmtype, 'regions.png', sep='_'),
+png(paste('Fig/', emmtype, 'regions2.png', sep='_'),
     res=600, width=5, height=4, units="in")
 ranScanPlotCluster3(tmp.33, case.df.tmp1, emmtype, xlim=c(-2200, 1500))
 dev.off()
 
-png(paste('Manuscript/', emmtype, '.png', sep='_'),
+png(paste('Fig/', emmtype, '2.png', sep='_'),
     res=600, width=5, height=4, units="in")
 ranScanPlotCluster(tmp.33, case.df.tmp1, emmtype)
 dev.off()
 
-png(paste('Manuscript/', emmtype, 'thresh.png', sep='_'),
+png(paste('Fig/', emmtype, 'thresh2.png', sep='_'),
     res=600, width=5, height=4, units="in")
 ranScanPlotCluster(tmp.33, case.df.tmp1, emmtype, threshold=0.95)
 dev.off()
 
-
-# 
 # # idxx = (tmp[,1] < 9.5) & (tmp[,1] > 3.5)
 # # idxy = (tmp[,2] < -3.5) & (tmp[,2] > -9.5)
 # 
@@ -60,13 +64,13 @@ case.df.tmp1[idxw,]$latitude %>% range
 case.df.tmp1[idxw,]$longitude %>% range
 # plotBaseMap(add=F, xlim=c(-5.5,1.5), ylim=c(50,52)) #emm type 94
 
-png('Manuscript/_33.0clust.png', res=500, width = 5, height = 4, units='in')
+png('Fig/_33.0_clust2.png', res=500, width = 5, height = 4, units='in')
 par(fig=c(0, 1, 0, 1))
 par(mar=c(0, 0, 0, 4))
 
 min_week = min(case.df.tmp1[idxw,]$SAMPLE_DT_numeric)
 
-plotBaseMap(add=F, xlim=c(-2.2, -0.3), ylim=c(51.8,54)) #emmtype 33
+plotBaseMap(add=F, xlim=c(-2.2, -0.3), ylim=c(51.8,54), onlyregion = F)
 
 colors = palette[case.df.tmp1[idxw,]$SAMPLE_DT_numeric - min(case.df.tmp1[idxw,]$SAMPLE_DT_numeric)]
 points(latitude ~ longitude,
@@ -75,17 +79,16 @@ points(latitude ~ longitude,
 
 par(fig=c(0.86, 0.88, 0.2, 0.8), new=T)
 par(mar=c(0,0,0,0))
-plot(c(0, 1), c(min_week, len(palette) + min_week), yaxt='n', xaxt='n', col=NULL, frame.plot=F, ylab='time')
+plot(c(0, 1), c(min_week, length(palette) + min_week), yaxt='n', xaxt='n', col=NULL, frame.plot=F, ylab='time')
 
 Cb = matrix(rep(palette, 5), nrow = length(palette), ncol = 5)
-rasterImage(Cb[seq(length(palette), 1, -1),], 0, min_week, 1, len(palette) + min_week)
+rasterImage(Cb[seq(length(palette), 1, -1),], 0, min_week, 1, length(palette) + min_week)
 rect(0, min_week, 1, min_week+length(palette))
 
 rr = range(case.df.tmp1[idxw,]$SAMPLE_DT_numeric)
 ticks = seq(rr[1], rr[2])
+axis(side = 4, at=ticks, tck=-0.5, labels = NA)
+ticks = ticks[round(seq(1,length(ticks), length.out = 3))]
+axis(side = 4, at=ticks, tck=-1.1, labels=week2Date(ticks))
 
-axis(side = 4, at=ticks, labels=week2Date(ticks))
-
-#mtext("time [week]", side = 4, line = 2)
 dev.off()
-

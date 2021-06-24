@@ -16,7 +16,6 @@ ranScanUpdate<-function(case.file, postcode.file=default.postcode.file){
     return(0)
   }
   
-  
   # UPDATE case.df
   case.df.new = read_excel(case.file)
   case.df.new = as.data.frame(case.df.new)

@@ -32,6 +32,7 @@ win = owin(poly = data.frame(x=rev(c(0.1,0.2,0.3,0.4,0.44,0.31,0.22)),
 my_blues = c("#F7FBFF", "#DEEBF7", "#C6DBEF", "#9ECAE1", "#6BAED6","#4292C6","#2171B5")
 #blues9
 ColorRamp=colorRampPalette(c(my_blues))(1000)
+len=length
 ```
 
 ```{r}
@@ -129,9 +130,9 @@ compute_cylinders<-function(cylinder, observations, tabulated.baseline){
   in_height = (observations$t >= t.low) & (observations$t <= t.upp)
   n_cases_in_cylinder = sum(in_circle & in_height)
   
-  ci = qpois(c(0.25,0.95) , lambda=mu)
+ # ci = qpois(c(0.25,0.95) , lambda=mu)
   p.val = ppois(n_cases_in_cylinder, lambda=mu, lower.tail=FALSE)
-  return (c(n_cases_in_cylinder, mu, ci, p.val))
+  return (c(n_cases_in_cylinder, mu, p.val))
 }
 ```
 
@@ -139,8 +140,25 @@ compute_cylinders<-function(cylinder, observations, tabulated.baseline){
 check timeliness
 
 ```{r}
-cylinders.list = list()
-for  (t.index in 5:n.weeks){
+tabulated.baseline = expand.grid(xx,yy,1:n.weeks)
+names(tabulated.baseline) = c('x', 'y', 't')
+tabulated.baseline$z = apply(tabulated.baseline, 1,
+                             function(x){
+  temporal.trend.function(x['t']) * spatial.trend.function(x['x'],x['y'])})
+# mean.baseline = mean( do.call(rbind, z) )
+
+mean.baseline = mean(tabulated.baseline$z)
+
+total.cases =  nrow(observations)
+total.expected.cases = sum(tabulated.baseline$z) * delta2
+correction.factor = total.cases / total.expected.cases
+tabulated.baseline$z = tabulated.baseline$z * correction.factor
+```
+
+
+```{r}
+#cylinders.list = list()
+for  (t.index in 7:n.weeks){
   n.cylinders = 4000 / n.weeks * t.index
   
   t.max = min(5, t.index)
@@ -162,19 +180,24 @@ for  (t.index in 5:n.weeks){
   
   t.low = t - round(radia_and_heights[,1]/2)
   t.low = ifelse(t.low > 0, t.low, 1)
-  t.upp = t.low + round(radia_and_heights[,1]/2)
+  t.upp = t + round(radia_and_heights[,1]/2)
   t.max = max(observations.tmp$t)
   t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
   
-  cylinders.tmp = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations.tmp$x[idx],  original.y=observations.tmp$y[idx])
+  cylinders.tmp = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations.tmp$x[idx],  original.y=observations.tmp$y[idx], original.t=observations.tmp$t[idx])
   
-  cylinders.tmp[,c('n_obs', 'mu', 'lower', 'upper', 'p.val')] = t(apply(cylinders.tmp, 1, compute_cylinders,
+  cylinders.tmp[,c('n_obs', 'mu', 'p.val')] = t(apply(cylinders.tmp, 1, compute_cylinders,
                                                     observations.tmp, tabulated.baseline.tmp))
   
-  cylinders.tmp$warning = apply(cylinders.tmp, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
+ # cylinders.tmp$warning = apply(cylinders.tmp, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
+  
+  cylinders.tmp$warning = (cylinders.tmp$p.val < 0.05) & (cylinders.tmp$n_obs > 0)
   
   cylinders.list[[t.index]] = cylinders.tmp
 }
+rm(cylinders.tmp)
+rm(tabulated.baseline.tmp)
+rm(observations.tmp)
 ```
 
 
@@ -367,7 +390,7 @@ legend('bottomright', c('outbreak, t=7','endemic, t=7'), lwd=c(1,1,NA),
 tab.red = '#d62728'
 tab.blue = '#1f77b4'
 init_size = observations.list[[20]]$t %>% table %>% as.data.frame()
-png(paste0('../Manuscript/timeliness_','.png'), width = 5 * 2.8, height = 4, units = 'in', res=600, pointsize = 20)
+png(paste0('../Manuscript/timeliness__','.png'), width = 5 * 2.8, height = 4, units = 'in', res=600, pointsize = 20)
 par(mfrow=c(1, 3), mar= c(4, 4, 0.5, 0.5) )
 plot(
   c(5,20), c(0,1), type='n', xlab = expression(tau), ylab=expression(italic(w)), axes=FALSE, cex.lab=1.4)
@@ -394,7 +417,7 @@ t = 5
     axis(side = 1, at = 5:20)
     axis(side = 2)
   }
-
+abline(h=0.95, col='#7f7f7f')
 legend('bottomright', c('outbreak, t=5','endemic, t=5'), lwd=c(1,1),
        lty=c(1,2), col=c(tab.red, tab.blue), pch=c(15,17), pt.cex=0.5)
 plot(
@@ -422,7 +445,7 @@ t = 6
     axis(side = 1, at = 5:20)
     axis(side = 2)
   }
-
+abline(h=0.95, col='#7f7f7f')
 legend('bottomright', c('outbreak, t=6','endemic, t=6'), lwd=c(1,1),
        lty=c(1, 2), col=c(tab.red, tab.blue),  pch=c(15,17), pt.cex=0.5)
 plot(
@@ -449,7 +472,7 @@ plot(
     axis(side = 1, at = 5:20)
     axis(side = 2)
   }
-
+abline(h=0.95, col='#7f7f7f')
 legend('bottomright', c('outbreak, t=7','endemic, t=7'), lwd=c(1, 1),
        lty=c(1,2), pch=c(15,17), col=c(tab.red, tab.blue), pt.cex=0.5)
 

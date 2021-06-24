@@ -128,9 +128,9 @@ compute_cylinders<-function(cylinder, observations, tabulated.baseline){
   in_height = (observations$t >= t.low) & (observations$t <= t.upp)
   n_cases_in_cylinder = sum(in_circle & in_height)
   
-  ci = qpois(c(0.25,0.95) , lambda=mu)
+#  ci = qpois(c(0.25,0.95) , lambda=mu)
   p.val = ppois(n_cases_in_cylinder, lambda=mu, lower.tail=FALSE)
-  return (c(n_cases_in_cylinder, mu, ci, p.val))
+  return (c(n_cases_in_cylinder, mu, p.val))
 }
 ```
 
@@ -171,7 +171,7 @@ t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
 
 cylinders = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations$x[idx],  original.y=observations$y[idx])
 
-cylinders[,c('n_obs', 'mu', 'lower', 'upper', 'p.val')] = t(apply(cylinders, 1, compute_cylinders,
+cylinders[,c('n_obs', 'mu',  'p.val')] = t(apply(cylinders, 1, compute_cylinders,
                                                   observations, tabulated.baseline))
 
 # cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
@@ -185,7 +185,7 @@ print(Sys.time() - init)
 init=Sys.time()
 cylinders3 = cylinders
 cylinders3$rho = cylinders3$rho * 1.4
-cylinders3[,c('n_obs', 'mu', 'lower', 'upper', 'p.val')] = t(apply(cylinders3, 1, compute_cylinders, observations, tabulated.baseline))
+cylinders3[,c('n_obs', 'mu', 'p.val')] = t(apply(cylinders3, 1, compute_cylinders, observations, tabulated.baseline))
 
 # cylinders3$warning = apply(cylinders3, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
 cylinders3$warning = (cylinders3['p.val'] < 0.05) & (cylinders3['n_obs'] > 0)
@@ -339,20 +339,22 @@ idxb = which(df1$cc1.thresholds < 0.95)
 idx = c(idxa[1], idxb[length(idxb)])
 # print(df1)
 spec_sens_cc1 = colMeans(df1[idx,])
-
+print(spec_sens_cc1)
 
 idxa = which(df2$cc2.thresholds > 0.95)
 idxb = which(df2$cc2.thresholds < 0.95)
 idx = c(idxa[1], idxb[length(idxb)])
 # print(df2)
 spec_sens_cc2 = colMeans(df2[idx,])
+
+print(spec_sens_cc2)
 ```
 
 Sensitivity: the ability of a test to correctly identify epidemic events.
 Specificity: the ability of a test to correctly identify non-epidemic events.
 
 
-```{r}
+```{r warning=FALSE}
 options(warn = - 1)
 #conf_matrix<-table(ifelse(observations$warning.score2 > 0.95, T, F), observations$warning)
 # sens = caret::sensitivity(conf_matrix)
@@ -374,10 +376,11 @@ for (i in 1:50){
   auc = c(auc,as.numeric(cc['auc'][[1]]))
 }
 print(quantile(auc, c(0.025,0.5,0.975) ))
-
 par(mfrow=c(1,1), mar=c(0.5, 0.5, 0.5, 0.5))
+
 cc = pROC::roc(as.integer(warning) ~ warning.score3, observations)
-plot(cc, col='black', identity.col='black',  grid.col='red', grid.v=spec_sens_cc1[1], grid.h = spec_sens_cc1[2])
+plot(cc, col='black', identity.col='black',
+     grid.col='red', grid.v=spec_sens_cc2[1], grid.h = spec_sens_cc2[2])
 auc = as.numeric(cc['auc'][[1]])
 L = nrow(observations)
 for (i in 1:50){
@@ -388,11 +391,11 @@ for (i in 1:50){
   auc = c(auc,as.numeric(cc['auc'][[1]]))
 }
 print(quantile(auc, c(0.025,0.5,0.975) ))
-# dev.off()
+#dev.off()
 ```
 
 
-```{r}
+```{r warning=FALSE}
 png('../Manuscript/simulation_experiment_ROC_CORR.png',
  width = 3.25 *3, height = 3.25, units = 'in', res=600, pointsize = 20)
 par(mfrow=c(1,3))
@@ -412,7 +415,7 @@ for (i in 1:50){
 mtext('A', 1, at = 0.1, padj = -1, cex=1.5)
 
 cc = pROC::roc(as.integer(warning) ~ warning.score3, observations)
-plot(cc, col='black', identity.col='black',  grid.col='red', grid.v=spec_sens_cc1[1], grid.h = spec_sens_cc1[2])
+plot(cc, col='black', identity.col='black',  grid.col='red', grid.v=spec_sens_cc2[1], grid.h = spec_sens_cc2[2])
 auc = as.numeric(cc['auc'][[1]])
 L = nrow(observations)
 for (i in 1:50){

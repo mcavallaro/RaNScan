@@ -2,100 +2,82 @@
 title: "Prospective analysis"
 ---
 
-
-```{r}
-source("ranScanInit.r")
+```{r warning=TRUE, include=FALSE}
+source("ranScanInit2.r")
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
-tmp = ranScanInit(case.file)
+case.df = ranScanInit(case.file)
 ```
 
 
 ```{r}
-emmtype='108.1'
+emmtype='44.0'
 ranScanCreateObservationMatrices(case.file, emmtype)
 load(paste0("~/Outbreak/Data/", emmtype, "_obs.Rdata"))
 #time.factor = ranScanTimeFactor(case.file)
-
 ```
 
 ```{r}
 baseline.matrix = ranScanCreateBaselineMatrix(case.file)
 ```
 
+
+```{r}
+init=Sys.time()
+postcode2coord = ranScanPostcodeMap(observation.matrix)
+print(Sys.time()-init)
+```
+
 ```{r}
 emmtype.factor = ranScanEmmtypeFactor.tau(case.file, emmtype)
 ```
 
-```{r}
+```{r include=FALSE}
 source("ranScanEvaluate.r")
+```
+
+
+```{r include=FALSE}
 sizefactor = 1.2
-n_cyl = 50000
+n_cyl = 50000 # min(50000, sum(obs.matrix.typed[-13,]) * 10 )
 
 # moltiplicazione columnwise
 baseline.matrix.tmp = baseline.matrix * rep(c(0,0,emmtype.factor[[emmtype]]), rep(NROW(baseline.matrix), NCOL(baseline.matrix) ))
 postcode2coord = ranScanPostcodeMap(observation.matrix)
-#sum(baseline.matrix) > 2 * sum(observation.matrix))
-weeks = 96:298
-n.rows = sum(tmp$case.df$emmtype == emmtype)
+
+weeks = 96:max(as.integer(colnames(observation.matrix)), na.rm = T)
+
+n.rows = sum(case.df$emmtype == emmtype)
 n.cols = len(weeks)
 to.export = as.data.frame(matrix(NA, nrow = n.rows, ncol = n.cols))
-names(to.export) = mapply(function(x){paste0('week',x)}, as.character(weeks))
-
+names(to.export) = mapply(function(x){week2Date(x)}, as.character(weeks))
+#
 for (week in weeks){
-  week.min = max(1, week - 200)
-  week.range = c(1, week)
-  cat('week',week, week.range,'\t')
-  cylinders = ranScanCreateCylinders(observation.matrix[,1:week], baseline.matrix.tmp[,1:week], emmtype, week.range, n_cyl, postcode2coord, size_factor = sizefactor)
+  week.min = max(0, week - 200)
+  week.range = as.character(week.min:week)
+  cat('weeks:', range(as.integer(week.range)),'\t')
+  
+  cylinders = ranScanCreateCylinders(observation.matrix[,week.range], baseline.matrix.tmp[,week.range], emmtype, week.range, n_cyl, postcode2coord, size_factor = sizefactor)
   
   case.df.tmp = ranScanEvaluate(case.file, cylinders, emmtype, p.val.threshold=0.05)
   ws = case.df.tmp[case.df.tmp$emmtype == emmtype,]$warning.score
   i = week - weeks[1] + 1
   to.export[, i] = ws
 }
+```
 
+
+```{r}
 dataframe.to.export = cbind(case.df.tmp[case.df.tmp$emmtype == emmtype,], to.export)
 dataframe.to.export$warning.score = NULL
-#plot(weeks, unlist(dataframe.to.export[2,16:218]))
+write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '__no_delay.csv'))
 ```
 
 ```{r}
-plot(c(100,300), c(0.5,1), col='white')
-for (i in 1:2300){
-  if( !is.na(dataframe.to.export[i,'x'])){
-    lines(weeks, unlist(dataframe.to.export[i,16:218]))
-  }
-}
-abline(h=0.95)
+dataframe.to.export = read.csv(paste0('emmtype_', emmtype, '__no_delay.csv'), row.names = 1, check.names = F)
+plot.spaghetti(dataframe.to.export)
 ```
 
 
 
-```{r}
-write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '_corrected_sf1.2.csv'))
-```
 
-```{r}
-dataframe.to.export2 = read.csv('emmtype_44.0_corrected.csv', row.names = 1)
-plot(c(100,300), c(0,1), col='white')
-for (i in 1:680){
-  if( !is.na(dataframe.to.export[i,'x'])){
-    lines(weeks, unlist(dataframe.to.export2[i,16:218]))    
-  }
-}
-```
-
-
-convert header to date:
-
-```{r}
-dataframe.to.export1 = read.csv('emmtype_44.0_sf1.2.csv', row.names = 1)
-#dataframe.to.export2 = read.csv('emmtype_33.0_sf1.2.csv', row.names = 1)
-#dataframe.to.export3 = read.csv('emmtype_1.0_sf1.2.csv', row.names = 1)
-
-names(dataframe.to.export1)[16:218] = sapply(seq(96,298), week2Date)
-#names(dataframe.to.export2)[16:218]
-#
-write.csv(dataframe.to.export1, file = paste0('emmtype_44.0_sf1.2_.csv'))
-#
-```
 

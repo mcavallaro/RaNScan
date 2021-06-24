@@ -1,10 +1,9 @@
 
-#default.postcode.file = "Data/Postcode_Estimates_Table_with_coordinates2.csv"
 source("utils.R")
-library(sf)
+#library(sf)
 library(KernSmooth)
-library(spatstat)
-library(truncnorm)
+#library(spatstat)
+#library(truncnorm)
 source("surveillance_utils.R")
 source("plot_utils.R")
 
@@ -15,47 +14,51 @@ source("plot_utils.R")
 #X.range = range(postcode2coord[!is.na(postcode2coord$longitude),]$longitude) +  c(-2,2) * var(postcode2coord[!is.na(postcode2coord$longitude),]$longitude)
 # [1] -4.717408  0.348140
 
+
+#' n.cylinders=10000 takes around 3 hours for the whole dataset, to end up with 300 non-empty cylinders
+#' observation.matrix  and baseline.matrix have dimension 
+#' This function scans the matrices
+#' -1 in observation.matrix index means that we are excluding from week NA
+#' @param emmtype
+#' @param week.range
+#' @param n.cylinders (integer) number of proposed cylinders per week interval.
+#' @param rs
+#' @param p.val.threshold
 ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
                                  week.range, n.cylinders=1000, rs=0.1,
-                                 p.val.threshold=0.05, plot=F, coord.df=postcode2coord,  size_factor=1){
-  # n.cylinders=10000 takes around 3 hours for the whole dataset, to end up with 300 non-empty cylinders
-  # observation.matrix  and baseline.matrix have dimension 
-  # This function scans the matrices
-  # -1 in observation.matrix index means that we are excluding from week NA
-  #' @param emmtype
-  #' @param week.range
-  #' @param n.cylinders (integer) number of proposed cylinders per week interval.
-  #' @param rs
-  #' @param p.val.threshold
-  #' @param plot (boolean)
+                                 p.val.threshold=0.05, coord.df=postcode2coord, size_factor=1){
   observation.matrix = observation.matrix[!(rownames(observation.matrix) == 'NA'),]
   baseline.matrix = baseline.matrix[!(rownames(baseline.matrix) == 'NA'),]
+  
+  observation.matrix = observation.matrix[,!(colnames(observation.matrix) == 'NA')]
+  baseline.matrix = baseline.matrix[,!(colnames(baseline.matrix) == 'NA')]
+  
   week.range = range(as.integer(week.range))
   
-  print(sum(baseline.matrix) )
-  print(sum(observation.matrix))
-  
   if (sum(baseline.matrix) > 2 * sum(observation.matrix)){
-    warning("Warning: the baseline is too high. Have you multiplied for the emmtype factor? e.g., `ranScanCreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['12.0']], '12.0', starting.week, n.cylinders=100, rs=0.1)`")
+    print(sum(baseline.matrix))
+    print(sum(observation.matrix))    
+    warning(
+      sprintf(
+        "Warning: the baseline is too high. Have you multiplied for the emmtype factor? e.g., `ranScanCreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['%s']], '%s', %d:%d, n.cylinders=100, rs=0.1)`", emmtype, emmtype, as.integer(week.range[1]), as.integer(week.range[2])
+      )
+    )
   }
   init=Sys.time()
   coord.df = coord.df[!is.na(coord.df$latitude),]
   coord.km.df = coord.df
   coord.km.df[,2:3] = vlatlong2km(coord.df[,2:3])
   if ((week.range[1] < min(as.integer(colnames(observation.matrix)))) | (week.range[2] > max(as.integer(colnames(observation.matrix))))){
-    # line = sprintf("Try with `starting.week` < %d", ncol(observation.matrix)-2)
-    # writeLines(c("`starting.week` is bigger than the matrix length.", line))
     A = sprintf("%d-%d", week.range[1], week.range[2])
-    B  = range(as.integer(colnames(observation.matrix)))
+    B = range(as.integer(colnames(observation.matrix)))
     B = sprintf("%d-%d", B[1], B[2])
-    writeLines(paste0("Error: `week.range`` is ", A, ", while the range of `observation.matrix` is ", B, "." ))
-    return(NA)
+    stop(paste0("`week.range`` is ", A, ", while the range of `observation.matrix` is ", B, "." ))
   }
   # weeks = as.integer(colnames(observation.matrix)[-seq(1:(starting.week+2))])
   # weeks = weeks[seq(1, length(weeks), 20)]
   # cylinders0 = data.frame(x=double(), y=double(), rho=double(), t.low=integer(), t.upp=integer(), n_obs=integer(), mu=double(), lower=integer(), upper=integer(), p.val=double(), warning=logical())
   radia_and_heights = f_radia_and_heights(baseline.matrix, 1:24) * size_factor
-  cat("Evaluating exceedances from ",
+  cat("Evaluating cylinder exceedances from ",
         as.character(week2Date(week.range[1])),   # this interactive output doesnt work in the prospective mode
         " to ",
         as.character(week2Date(week.range[2])),        
@@ -64,51 +67,100 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
   # generate cylinders
   cylinders = rcylinder2(n.cylinders, observation.matrix, week.range, radia_and_heights, coord.km.df)
   if (NROW(cylinders) > 0){
-    cylinders[,c('n_obs', 'mu', 'lower', 'upper', 'p.val')] = t(apply(cylinders, 1, compute,
+    cylinders[,c('n_obs', 'mu', 'p.val')] = t(apply(cylinders, 1, compute,
                                                     observation.matrix, baseline.matrix, coord.km.df))
     ## da vettorizzare:
     # cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < p.val.threshold) & (x['n_obs'] > 0), TRUE, FALSE)})
     # vettorizzato:
-    cylinders$warning = cylinders['p.val'] < p.val.threshold
+    cylinders$warning = cylinders$p.val < p.val.threshold
   }else{
-    cat("No cases in the selected week range. No cylinder list returned.\n")
+    cat("No cases in the selected week range.\n")
   }
   print(Sys.time() - init)
   return(cylinders)
 }
 
-# 
-# if (plot){
-#   output.basename = paste0("Exceed_", emmtype, "_", as.character(week2Date(week.range[1])), "_", as.character(week2Date(week.range[2])))
-#   # For each location, count how many cylinders are warning and how many are not.
-#   warning.ratio = sapply(1:nrow(coord.df),
-#                          FUN=warning_ratio,
-#                          observation.matrix[,week.range[1]:week.range[2]], cylinders, coord.df)
-#   
-#   idx = which(warning.ratio > p.val.threshold)
-#   png(paste0(output.basename, '.png'), width = 3.25, height = 3.25, units = 'in', res=1200, pointsize = 4)
-#   par(mar=c(2,2,4,2))
-#   plot_map( X.range+c(1,-1), Y.range, main=paste("Exceedances from", week2Date(week.range[1]), "to", week2Date(week.range[2])))
-#   plot_cylinders(cylinders[cylinders$warning,], lwd=0.4)
-#   plot_cases(observation.matrix, week.range,  coord.df)
-#   plot_cases(observation.matrix[idx,], week.range,  coord.df[idx,], col='red')
-#   dev.off()
-#   # save cases on file
-#   tmp.table = observation.matrix[idx, week.range[1]:week.range[2]]
-#   colnames(tmp.table) = sapply(colnames(tmp.table), function(x){as.character(week2Date(as.integer(x)))})
-#   write.table(tmp.table,
-#               file=paste0(output.basename, ".csv"), sep=',', row.names = T, col.names = T, quote = T)
-# }
+
+#' 
+#' n.cylinders=10000 takes around 3 hours for the whole dataset, to end up with 300 non-empty cylinders
+#' observation.matrix  and baseline.matrix have dimension 
+#' This function scans the matrices
+#' -1 in observation.matrix index means that we are excluding from week NA
+#' @inheritParams aFunction
+#' @param observation.matrix.untyped
+#' @param baseline.matrix.untyped
+#' 
+ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix.typed,
+                                 observation.matrix.untyped, baseline.matrix.untyped,
+                                 emmtype,
+                                 week.range, n.cylinders=1000, rs=0.1,
+                                 p.val.threshold=0.05, coord.df=postcode2coord,  size_factor=1){
+  observation.matrix.typed = as.matrix(observation.matrix.typed[!(rownames(observation.matrix.typed) == 'NA'),])
+  baseline.matrix.typed = as.matrix(baseline.matrix.typed[!(rownames(baseline.matrix.typed) == 'NA'),])
+  observation.matrix.untyped = as.matrix(observation.matrix.untyped[!(rownames(observation.matrix.untyped) == 'NA'),])
+  baseline.matrix.untyped = as.matrix(baseline.matrix.untyped[!(rownames(baseline.matrix.untyped) == 'NA'),])
+
+  week.range = range(as.integer(week.range))
+  
+  c1 = sum(baseline.matrix.typed) > 2 * sum(observation.matrix.typed)
+  c2 = sum(baseline.matrix.untyped) > 2 * sum(observation.matrix.untyped)
+  if (c1){
+    warning("Warning: the typed baseline is very high.")
+  }
+  if (c2){
+    warning("Warning: the untyped baseline seems is very high.")
+  }
+  init=Sys.time()
+  coord.df = coord.df[!is.na(coord.df$latitude),]
+  coord.km.df = coord.df
+  coord.km.df[,2:3] = vlatlong2km(coord.df[,2:3])
+  if ((week.range[1] < min(as.integer(colnames(observation.matrix.typed)))) | (week.range[2] > max(as.integer(colnames(observation.matrix.typed))))){
+    # line = sprintf("Try with `starting.week` < %d", ncol(observation.matrix)-2)
+    # writeLines(c("`starting.week` is bigger than the matrix length.", line))
+    A = sprintf("%d-%d", week.range[1], week.range[2])
+    B = range(as.integer(colnames(observation.matrix.typed)))
+    B = sprintf("%d-%d", B[1], B[2])
+    writeLines(paste0("Error: `week.range` is ", A, ", while the range of `observation.matrix` is ", B, "." ))
+    return(NA)
+  }
+  # weeks = as.integer(colnames(observation.matrix)[-seq(1:(starting.week+2))])
+  # weeks = weeks[seq(1, length(weeks), 20)]
+  # cylinders0 = data.frame(x=double(), y=double(), rho=double(), t.low=integer(), t.upp=integer(), n_obs=integer(), mu=double(), lower=integer(), upper=integer(), p.val=double(), warning=logical())
+  radia_and_heights = f_radia_and_heights(baseline.matrix.typed, 1:24) * size_factor
+  cat("Evaluating cylinder exceedances from ",
+      as.character(week2Date(week.range[1])),   # this interactive output doesnt work in the prospective mode
+      " to ",
+      as.character(week2Date(week.range[2])),        
+      " for emm type ", emmtype, ".\n")
+
+  # generate cylinders
+  cylinders = rcylinder2(n.cylinders, observation.matrix.typed + observation.matrix.untyped, week.range, radia_and_heights, coord.km.df)
+  if (NROW(cylinders) > 0){
+    cylinders[,c('n_obs.typed', 'mu.typed', 'p.val.typed')] = t(apply(cylinders, 1, compute,
+                                                                observation.matrix.typed,
+                                                                baseline.matrix.typed,
+                                                                coord.km.df))
+    cylinders[,c('n_obs.untyped', 'mu.untyped', 'p.val.untyped')] = t(apply(cylinders, 1, compute,
+                                                                            observation.matrix.untyped,
+                                                                            baseline.matrix.untyped,
+                                                                            coord.km.df))
+  }else{
+    cat("No (typed) cases in the selected week range.\n")
+  }
+  cylinders$warning = (cylinders$p.val.typed < p.val.threshold) | (cylinders$p.val.untyped < p.val.threshold)
+  print(Sys.time() - init)
+  return(cylinders)
+}
 
 ranScanPlotCylindersCI<-function(cylinders, confidence.level=0.68, title=NULL){
-  plot(n_obs ~ mu, cylinders, title=title, xlab = 'Expected cases', ylab = 'Observed cases', pch=20, cex=0.8)
-  mu=max(cylinders$mu)
-  lines(0:mu, 0:mu)
-  x = seq(0,mu,0.1)
+  plot(n_obs.typed ~ mu.typed, cylinders, title=title, xlab = 'Expected cases', ylab = 'Observed cases', pch=20, cex=0.8)
+  mu=max(cylinders$mu.typed)
+  lines(0: mu, 0:mu)
+  x = seq(0, mu, 0.1)
   upper=qpois(confidence.level, x)
   lower=qpois(1-confidence.level, x)
   polygon(c(x, x[length(x):1]),c(upper, lower[length(lower):1]), col="#a6a6a666", border = "#a6a6a600")
-  points(cylinders[cylinders$warning,]$mu, cylinders[cylinders$warning,]$n_obs, col='red', pch=20, cex=0.9)
+  points(cylinders[cylinders$warning,]$mu.typed, cylinders[cylinders$warning,]$n_obs.typed, col='red', pch=20, cex=0.9)
 }
 
 ranScanSaveCylinders<-function(cylinders, file.basename){
@@ -116,8 +168,8 @@ ranScanSaveCylinders<-function(cylinders, file.basename){
   save.and.tell("cylinders", file = paste0(file.basename,'.Rdata'))
 }
 
-ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold=0.05,
-                          warning.score.name='warning.score'){
+ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold = 0.05,
+                          warning.score.name = 'warning.score', date.time.field = 'SAMPLE_DT_numeric'){
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
     case.df
@@ -126,9 +178,6 @@ ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold=0.05,
     case.df = ranScanInit(case.file)
     return(case.df$case.df)
   })
-  # if (!is.null(p.val.threshold)){
-  #   cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < p.val.threshold) & (x['n_obs'] > 0), TRUE, FALSE)})
-  # }
   if (!('x' %in% names(case.df) & ('y' %in% names(case.df)))){
     writeLines("Inserting coordinates...")
     if (!('latitude' %in% names(case.df) & ('longitude' %in% names(case.df)))){
@@ -140,44 +189,11 @@ ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold=0.05,
   }
   idx = case.df$emmtype == emmtype
   writeLines(paste0("Computing warning scores for emmtype ", emmtype, "..."))
-  case.df[idx,warning.score.name] = apply(case.df[idx,], 1, FUN=warning.score, cylinders)
+  case.df[idx, warning.score.name] = apply(case.df[idx,], 1, FUN=warning.score, cylinders, date.time.field)
   writeLines("...Done.")
-  return(case.df)  
+  return(case.df)
 }
 
-
-PostcodeAreasBoundaries=st_read("shape_file_new/Areas.shp")
-# Keep only Englandpostcode areas:
-PostCodeAreas=as.character(PostcodeAreasBoundaries[[1]])
-PostCodeAreasC = read.csv("Data/Book1.csv")
-PostCodeAreasC = PostCodeAreasC[PostCodeAreasC$Country=='England', ]
-id = sapply(PostCodeAreas, function(x){x %in% PostCodeAreasC[,1]})
-PostcodeAreasBoundaries = st_geometry(PostcodeAreasBoundaries)[id]
-rm(id)
-RegionBoundaries = st_read("shape_files/RegionBoundaries.shp")
-RegionBoundaries = st_transform(RegionBoundaries, crs=st_crs(PostcodeAreasBoundaries))
-UK = st_read("Other maps/Map_UK.shp")
-UK = st_transform(UK, crs=st_crs(PostcodeAreasBoundaries))
-Wales. = st_union(UK[UK$NAME_1=='Wales',])
-
-plotBaseMap<-function(main=NULL, add=T, Wales=TRUE, ...){
-  plot(st_geometry(UK), col=NA, border='#e2e2e288', lwd=0.8,  add=add,...)
-  if (Wales){
-    plot(st_geometry(Wales.), axes=F, border='black', lwd=1, add=T)    
-  }
-  plot(st_geometry(RegionBoundaries), axes=F, border='black', lwd=1,  main=main, add=T)
-  # box(lwd=0.1)
-}
-X.range = c(-6,2)
-Y.range = c(50,56)
-#EnglandBoundaries=st_union(st_geometry(RegionBoundaries))
-
-is_inside<-function(i,j,x,y){
-  latitude=y[i]
-  longitude=x[j]
-  stp=st_point(c(longitude, latitude))
-  return(!is.empty(st_contains(st_geometry(EnglandBoundaries), stp)[[1]]))
-}
 
 
 plotBaseline<-function(week, emmtype, z, add=F, tf=factor, emmf=emmtype.factor){
@@ -261,7 +277,7 @@ ranScanCluster<-function(case.df, emmtype, makeplot=FALSE, warning.score='warnin
   X = tsne(case.df[,c('x', 'y', 'SAMPLE_DT_numeric')])
   # palette = colorRampPalette(c('blue', 'red'))(max(case.df$SAMPLE_DT_numeric))
   if (makeplot == TRUE){
-    library(viridis)
+    library(viridisLite)
     palette = viridis(max(case.df$SAMPLE_DT_numeric), begin = 0, end = 1)
     warning.marker = 20 #ifelse(case.df[,warning.score] > 0.9, 20, 1)
     plot(X[,1],X[,2], xlab='C1', ylab='C2', col=palette[case.df$SAMPLE_DT_numeric], pch=warning.marker,
@@ -274,7 +290,7 @@ ranScanCluster<-function(case.df, emmtype, makeplot=FALSE, warning.score='warnin
   return(X)
 }
 
-ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score', ...){
+ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score', legend.pos="bottomleft", ...){
   threshold = 0.95
   idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
   case.df = case.df[idx, ]
@@ -284,11 +300,12 @@ ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score'
   #main=paste0('Embedding for emmtype ',emmtype)
   plot(X[,1], X[,2], xlab='C1', ylab='C2', col=palette[round(case.df[,warning.score] * 100+1)], pch=19, ...)
   idx2 = (case.df[,warning.score]>0.95)
-  points(X[idx2,1], X[idx2,2], cex = 2)
+  points(X[idx2,1], X[idx2,2], cex = 2, col=palette[round(case.df[,warning.score] * 100+1)][idx2])
   
-  legend("bottomleft", c("cases", as.expression(bquote(italic(w) ~ ">" ~ .(threshold)))),
-         col = c(palette[as.integer(length(palette)/2)], 'black'), pch=c(19,1), pt.cex = c(1, 2))
-  
+  pos=legend(legend.pos, c("cases", as.expression(bquote(italic(w) ~ ">" ~ .(threshold)))),
+         col = c(palette[as.integer(length(palette)/2)], 'red'), pch=c(19,1), pt.cex = c(1, 2))
+
+  points((pos$text$x[2] + pos$rect$left)/2, pos$text$y[2], pch=19, col='red')
   
   Cb = matrix(rep(palette, 5), nrow = length(palette), ncol = 5)
   par(fig=c(0.86, 0.88, 0.2, 0.8), new=T)
@@ -300,11 +317,11 @@ ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score'
   mtext("warning score", side = 4, line = 2)
 }
 
-ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score', threshold=NULL, ...){
+ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score', threshold=NULL, legend.pos="bottomleft", ...){
   if (is.null(threshold)){
-    ranScanPlotCluster0(X, case.df, emmtype, warning.score, ...)
+    ranScanPlotCluster0(X, case.df, emmtype, warning.score, legend.pos, ...)
   }else{
-    library(viridis)
+    library(viridisLite)
     idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
     case.df = case.df[idx, ]
     palette = viridis(max(case.df$SAMPLE_DT_numeric)+1, alpha = 1, begin = 0, end = 1)
@@ -315,14 +332,14 @@ ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score',
     palette = viridis(max(case.df$SAMPLE_DT_numeric), alpha = 1, begin = 0, end = 1)
     idx = ifelse(case.df[,warning.score] > threshold, T, F)
     points(X[idx,1], X[idx,2], xlab='C1', ylab='C2', col='black', pch=1, cex=2)
-    legend("bottomleft", c("cases", as.expression(bquote(italic(w)~ ">" ~ .(threshold)))),
+    legend(legend.pos, c("cases", as.expression(bquote(italic(w)~ ">" ~ .(threshold)))),
            col = c(palette[as.integer(length(palette)/2)], 'black'), pch=c(19,1), pt.cex = c(1, 2))
     
     Cb = matrix(rep(palette, 5), nrow = length(palette), ncol = 5)
     par(fig=c(0.86, 0.88, 0.2, 0.8), new=T)
     par(mar=c(0,0,0,0))
-    plot(c(0, 1), c(1, len(palette)), yaxt='n', xaxt='n', col=NULL, frame.plot=F, ylab='time')
-    rasterImage(Cb[seq(length(palette), 1, -1),], 0, 0, 1, len(palette))
+    plot(c(0, 1), c(1, length(palette)), yaxt='n', xaxt='n', col=NULL, frame.plot=F, ylab='time')
+    rasterImage(Cb[seq(length(palette), 1, -1),], 0, 0, 1, length(palette))
     rect(0, 0, 1, length(palette))
     rr = max(case.df$SAMPLE_DT_numeric)
 #    ticks = as.integer(seq(1, rr, (rr - 1)/ 10))
@@ -334,7 +351,7 @@ ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score',
 
 ranScanPlotCluster3<-function(X, case.df, emmtype,
                               warning.score='warning.score',
-                              threshold=0.95, Legend = T,...){
+                              threshold=0.95, legend.pos="bottomleft", ...){
     idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
     case.df = case.df[idx, ]
     ll = c("East Midlands", "East of England", "London", "North East",
@@ -364,7 +381,7 @@ ranScanPlotCluster3<-function(X, case.df, emmtype,
          col=case.df$color.Region.alpha, pch=19, ...)
 
 
-    idx2 = ifelse(case.df[,warning.score] > threshold, T, F)
+    idx2 = case.df[,warning.score] > threshold
     while((sum(idx2) == 0) & (threshold > 0)){
       threshold = threshold - 0.1
       print(threshold)
@@ -383,52 +400,12 @@ ranScanPlotCluster3<-function(X, case.df, emmtype,
     #          pch = 1, cex=0.7, pt.cex = 1.4)
     # }
     
-    legend('bottomleft',
+    legend(legend.pos,
            c(as.character(sort(unique(case.df$Postcode.Region))),
              as.expression(bquote(italic(w) ~ '>' ~ .(threshold)))),
            col=c(palette.alpha[sort(unique(case.df$Postcode.Region))], 'black'),
-           pch=c(rep(19, len(palette[sort(unique(case.df$Postcode.Region))])), 1),
-           pt.cex = c(rep(1, len(palette[sort(unique(case.df$Postcode.Region))])), 1.4),
+           pch=c(rep(19, length(palette[sort(unique(case.df$Postcode.Region))])), 1),
+           pt.cex = c(rep(1, length(palette[sort(unique(case.df$Postcode.Region))])), 1.4),
            cex=0.7
            )
 }
-
-#' ranScanMutateCylinders<-function(observation.matrix, baseline.matrix, cylinders, n.cylinders=NULL,
-#'                                  plot=F, p.val.threshold=0.05){
-#'   # observation.matrix  and baseline.matrix have dimension 
-#'   # This function scans the matrices 
-#'   # -1 in observation.matrix index means that we are excluding from week NA
-#'   #' @param emmtype
-#'   #' @param starting.week
-#'   #' @param n.cylinders
-#'   #' @param rs
-#'   #' @param p.val.threshold
-#'   #' @param plot (boolean)
-#'   #' 
-#'   if (sum(baseline.matrix) > 2 * sum(observation.matrix)){
-#'     writeLines("Warning: the baseline is too high. Have you multiplied for the emmtype factor?")
-#'   }
-#'   init=Sys.time()
-#'   if (is.null(n.cylinders)){
-#'     n = nrow(cylinders)    
-#'   }else{
-#'     n=n.cylinders
-#'   }
-#'   idx = sample(1:nrow(cylinders), size=n, prob = cylinders$n_obs, replace = T)
-#'   cylinders = cylinders[idx,]
-#'   cylinders$x = cylinders$x + rnorm(n, sd=0.3)
-#'   cylinders$y = cylinders$y + rnorm(n, sd=0.3)
-#'   b = round(max(cylinders$t.upp) - cylinders$t.upp)
-#'   shift = floor(rtruncnorm(n, b=b, mean=0, sd=2))
-#'   cylinders$t.low = cylinders$t.low + shift
-#'   cylinders$t.upp = cylinders$t.upp + shift
-#'   
-#'   cylinders[,c('n_obs', 'mu', 'lower', 'upper', 'p.val')] = t(apply(cylinders, 1, compute,
-#'                                                                     observation.matrix, 
-#'                                                                     baseline.matrix,
-#'                                                                     postcode2coord))
-#'   cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < p.val.threshold) & (x['n_obs'] > 0), TRUE, FALSE)})
-#'   print(Sys.time() - init)
-#'   return(cylinders)
-#' }
-

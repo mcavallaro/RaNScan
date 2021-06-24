@@ -27,7 +27,7 @@ neg.log.like<-function(params, data){
 
 cmle1<-function(data, cpar, iterations=10000){
   fn<-function(par){
-    if (all(par>c(0,2,0)) & all(par<c(100,100,365)) ){
+    if (all(par>c(0,2,0)) & all(par<c(100, 100, 60)) ){
       res = neg.log.like(c(par, cpar), data)
     }
     # else if ((par[4] < -0.1) | (par[4] > 0.1)){
@@ -39,7 +39,7 @@ cmle1<-function(data, cpar, iterations=10000){
     return(res)
   }
   n = 10
-  start<-data.frame(p1=runif(n,0, 100), p2=runif(n,2,100), p3=runif(n,1,365))
+  start<-data.frame(p1=runif(n,0, 100), p2=runif(n, 2, 100), p3=runif(n, 1, 60))
   opt<-function(init){
     res<-optimx(as.vector(init),
                 fn,
@@ -69,13 +69,19 @@ cmle2<-function(data, cpar){
 
 cmle<-function(data, n.cycles=10, start=NULL){
   par = cmle1(data, 0)
+  trace = matrix(data=0, nrow = n.cycles, ncol = 4)
   for (i in 1:n.cycles){
     cat("Estimating parameters for temporal trend, step ", i, " of ", n.cycles, ".\r")
+    trace[i,1:3] = par
     par1 = cmle2(data, par)
+    trace[i,4] = par1
     par = cmle1(data, par1)
   }
   par1 = cmle2(data, par)
-  return(c(par, par1))
+  res = c(par, par1)
+  trace[i,] = res
+  attributes(res) = list(trace=trace)
+  return(res)
 }
 
 
