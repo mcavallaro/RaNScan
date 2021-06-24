@@ -97,8 +97,18 @@ Aggregate epidemic and endemic cases and plot. It is worth noting that it is ess
 #print(sum(sim))
 sim2 = sim
 sim2[1:21, as.character(40:59)] = sim2[1:21, as.character(40:59)] + epi.matrix
-par(mfrow = c(1, 2))
 
+# par(mfrow = c(1, 2))
+# plot(colSums(sim), xlab='t', col='#1f77b4', pch=20, ylab='no. cases', main='endemic')
+# lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
+# mtext('A', side=3, padj=2, at=95, cex=2)
+# plot(colSums(sim2), pch=20, xlab='t', main='endemic + epidemic',  ylab='no. cases')
+# lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
+# mtext('B', side=3, padj=2, at=95, cex=2)
+
+
+png(paste0('Fig/end_epi_panel_',label.str,'.png'), width = 4 * 1.2 * 2, height = 3 * 1.2 * 2, units = 'in', res=400, pointsize = 13)
+par(mfrow = c(2, 2), mar=c(4,4,1,1)+0.1)
 plot(colSums(sim), xlab='t', col='#1f77b4', pch=20, ylab='no. cases', main='endemic')
 lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
 mtext('A', side=3, padj=2, at=95, cex=2)
@@ -107,49 +117,33 @@ lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), co
 mtext('B', side=3, padj=2, at=95, cex=2)
 
 
-#png(paste0('Fig/end_epi_temporal_',label.str,'.png'), width = 4 * 1.2 * 2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
-par(mfrow = c(1, 2), mar=c(4,4,1,1)+0.1)
-plot(colSums(sim), xlab='t', col='#1f77b4', pch=20, ylab='no. cases', main='endemic')
-lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
-mtext('A', side=3, padj=2, at=95, cex=2)
-plot(colSums(sim2), pch=20, xlab='t', main='endemic + epidemic',  ylab='no. cases')
-lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
-mtext('B', side=3, padj=2, at=95, cex=2)
-#dev.off()
-```
-
-
-
-
-
-```{r}
 df.cases2 = cbind(geo.location[idx,], rowSums(sim2))
 df.cases2 = as.data.frame(df.cases2)
 df.cases2 = cbind(rownames(geo.location[idx,]), df.cases2)
 colnames(df.cases2) = c('Postcode','latitude', 'longitude', 'n.cases')
 df2 = data.frame(longitude = rep(df.cases2[,'longitude'], df.cases2[,'n.cases']),
              latitude = rep(df.cases2[,'latitude'], df.cases2[,'n.cases']))
-
-par(mfrow = c(1, 2))
-plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic')
-#plotBaseMap(add=T, Wales=F)
-mtext('A', side=3, padj=2, at=1, cex=2)
-
-plot(df2$longitude, df2$latitude, axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic + epidemic')
-#plotBaseMap(add=T, Wales=F)
-mtext('B', side=3, padj=2, at=1, cex=2)
+# 
+# par(mfrow = c(1, 2))
+# plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic')
+# #plotBaseMap(add=T, Wales=F)
+# mtext('A', side=3, padj=2, at=1, cex=2)
+# 
+# plot(df2$longitude, df2$latitude, axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic + epidemic')
+# #plotBaseMap(add=T, Wales=F)
+# mtext('B', side=3, padj=2, at=1, cex=2)
 
 #png(paste0('Fig/end_epi_spatial1_', label.str, '.png'), width = 4 * 1.2 * 2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
-par(mfrow = c(1, 2), mar=c(1,1,2,1)+0.1)
+#par(mfrow = c(1, 2), mar=c(1,1,2,1)+0.1)
 plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, ylab=NA, main='endemic', ylim = c(50,56))
 plotBaseMap(add=T, Wales=F)
-mtext('A', side=3, padj=2, at=1, cex=2)
+mtext('C', side=3, padj=2, at=1, cex=2)
 
 plot(df2$longitude, df2$latitude,axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, main='endemic + epidemic', ylim = c(50,56))
 plotBaseMap(add=T, Wales=F)
-mtext('B', side=3, padj=2, at=1, cex=2)
+mtext('D', side=3, padj=2, at=1, cex=2)
 
-#dev.off()
+dev.off()
 rm(df2)
 ```
 
@@ -240,7 +234,7 @@ col = '#00000033'
 par(mfrow=c(1,1), mar=c(4,4,0,0))
 auc = numeric(0)
 #plot(ROC, col='black', identity.col='black',  grid.col='red')
-for (i in 1:50){
+for (i in 1:5){
   cc = roc(true_positive ~ warning.score, case.df[sample(1:L, L, replace = T),])
   if(i < 11){
 #    plot(cc, add=T, col=col, identity.col='black')    
@@ -271,15 +265,6 @@ dev.off()
 
 
 ```{r}
-# palette = colorRampPalette(c('#1f77b4', '#d62728'))(100)
-idx1 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score < 0.95)
-#colors = palette[as.integer(case.df[idx,]$warning.score * 100)+1]
-idx2 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score > 0.95)
-plot(case.df[idx1,]$longitude, case.df[idx1,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA)
-points(case.df[idx2,]$longitude, case.df[idx2,]$latitude, col='#d62728', pch=20, cex=1, ylab = NA, xlab=NA)
-
-
-
 ######
 plot.circle<-function(x,y,r, add=F, plot=T,...){
   t <- seq(0, 2*pi, length=100)
@@ -293,27 +278,39 @@ plot.circle<-function(x,y,r, add=F, plot=T,...){
   }
   return(coords)
 }
-png(paste0('Fig/satscan_',label.str,'.png'), width =  4 *1.2, height = 3 *1.2, units = 'in', res=400, pointsize = 17)
-par(mfrow = c(1, 1), mar=c(1,1,1,1)+0.1)
-plot(case.df$longitude, case.df$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA,  xlim=c(-0.65,0.3), ylim=c(51.4,51.8) )
+```
+
+```{r}
+# palette = colorRampPalette(c('#1f77b4', '#d62728'))(100)
+idx1 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score < 0.95)
+#colors = palette[as.integer(case.df[idx,]$warning.score * 100)+1]
+idx2 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score > 0.95)
+# plot(case.df[idx1,]$longitude, case.df[idx1,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA)
+# points(case.df[idx2,]$longitude, case.df[idx2,]$latitude, col='#d62728', pch=20, cex=1, ylab = NA, xlab=NA)
+#
+png(paste0('Fig/satscan_',label.str,'.png'), width =  4 *1.2 / 1.5, height = 3 *1.2 /1.5, units = 'in', res=400, pointsize = 20)
+par(mfrow = c(1, 1), mar=c(0,0,0,0) + 0.5)
 idx3=case.df$warning.score > 0.95
-points(case.df[idx3,]$longitude, case.df[idx3,]$latitude, col='#ff7f0e', pch=20, cex=1, ylab = NA, xlab=NA)
-points(case.df[case.df$true_positive,]$longitude, case.df[case.df$true_positive,]$latitude, col='#d62728', pch=4, cex=1, ylab = NA, xlab=NA)
-plotBaseMap(add=T, Wales = F)
-sim.col=st_read('Data/satscan_output.shp')
+plot(case.df[!idx3,]$longitude, case.df[!idx3,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA,  xlim=c(-0.58, 0.01), ylim=c(51.57, 51.8) )
+points(case.df[case.df$true_positive,]$longitude, case.df[case.df$true_positive,]$latitude, col='#d62728', pch=20, cex=1, ylab = NA, xlab=NA)
+points(case.df[idx3,]$longitude, case.df[idx3,]$latitude, col='#ff7f0e', pch=4, cex=1, ylab = NA, xlab=NA)
+
+plotBaseMap(add=T, Wales = F, onlyregion = T)
+sim.col=st_read('shape_files/satscan_output.shp')
 plot(sim.col[1], add=T, col=NA, border='#7f7f7f')
 dev.off()
-#########
-
-
-
-png(paste0('Fig/end_epi_spatial_',label.str,'.png'), width =  4 *1.2, height = 3 *1.2, units = 'in', res=400, pointsize = 13)
+```
+```{r}
+png(paste0('Fig/end_epi_spatial_',label.str,'.png'), width =  4 *1.6, height = 3 *1.6, units = 'in', res=600, pointsize = 13)
 par(mfrow = c(1, 1), mar=c(1,1,1,1)+0.1)
 
 plot(case.df[idx1,]$longitude, case.df[idx1,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA, ylim = c(50,56), xlim = c(-5.9, 1.8))
-points(case.df[idx2,]$longitude, case.df[idx2,]$latitude, col='#ff7f0e', pch=20, cex=1, ylab = NA, xlab=NA)
+points(case.df[idx2,]$longitude, case.df[idx2,]$latitude, col='#ff7f0e', pch=4, cex=1, ylab = NA, xlab=NA)
 plotBaseMap(add=T, Wales = F)
-legend('topleft', c( expression(italic(w)>=0.95),expression(italic(w)<0.95)), col=c("#ff7f0e", "#1f77b4"), pch=c(20,1))
+legend('topleft',
+       c( expression(italic(w)>=0.95),
+          expression(italic(w)<0.95),
+          "True outbreak"), col=c("#ff7f0e", "#1f77b4", '#d62728'), pch=c(4,1,20), box.col = "white")
 dev.off()
 ```
 
@@ -347,7 +344,15 @@ for (week in 40:59){
 ```{r}
 png(paste0('Fig/Fig_7DE', label.str,'.png'), width = 5 * 2.8 / 3, height = 4 * 2, units = 'in', res=600, pointsize = 15)
 par(mfrow=c(2, 1), mar= c(4, 4, 0.5, 0.5) )
+library(viridisLite)
 palette=inferno(len(40:59),begin=0.15, end=0.85, direction=-1)
+
+plot(case.df$warning.score, case.df$warning.score2,
+     xlab = expression(paste(italic(w),' (rep. 1)')), ylab = expression(paste(italic(w)," (rep. 2)")), col=colors, pch=ifelse(case.df$true_positive, 20,1))
+legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"), pch=c(20,1))
+
+mtext('D', side=3, padj=2, at=(42-40)/(58.5-40), cex=1.5)
+
 
 #png(paste0('Fig/timelines_', label.str, '.png'), width = 4 * 1.2, height = 3, units = 'in', res=400, pointsize = 13)
 #par(mar=c(4,4,1,1)+0.1)
@@ -369,13 +374,7 @@ for(i in 1:NROW(case.df[case.df$true_positive,  ])){
 }
 axis(2, at=c(0,0.25,0.5,0.75,1))
 axis(1, at = seq(40,59))
-mtext('D', side=3, padj=3, at=42, cex=1.5)
-
-plot(case.df$warning.score, case.df$warning.score2,
-     xlab = expression(paste(italic(w),' (rep. 1)')), ylab = expression(paste(italic(w)," (rep. 2)")), col=colors, pch=ifelse(case.df$true_positive, 20,1))
-legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"), pch=c(20,1))
-
-mtext('E', side=3, padj=2, at=(42-40)/(58.5-40), cex=1.5)
+mtext('E', side=3, padj=3, at=42, cex=1.5)
 
 dev.off()
 ```

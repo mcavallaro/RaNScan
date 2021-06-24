@@ -129,7 +129,6 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes, date.time.field 
   n.postcodes= length(postcodes)
   n.emmtypes = length(emmtypes)
   
-  
   n.weeks = max(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) - min(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) + 1
   for (e in 1:n.emmtypes){
     emmtype=emmtypes[e]
@@ -236,7 +235,7 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
   for (week in starting.week:MAX){
     # this represents the week at week the scores are calculated
     # fill the untyped observation.matrix with the cases that were detected by week "week"
-    # (SAMPLE_DT<week) but whose typing occurred after the same "week" (RECEIPT_DT>weel)
+    # (SAMPLE_DT<week) but whose typing occurred after the same "week" (RECEIPT_DT>week)
     idx = (case.df$SAMPLE_DT_numeric > week - n.weeks + 1) &
       (case.df$SAMPLE_DT_numeric <= week) &
       (case.df$RECEPT_DT_numeric > week)

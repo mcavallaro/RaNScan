@@ -8,7 +8,7 @@ case.df = ranScanInit(case.file)
 emmtype='44.0' ##44.0 #1.0 #33.0
 n.weeks = 150
 starting.week = 80
-case.df$`Patient Postcode` %>% unique %>% head(14)
+#case.df$`Patient Postcode` %>% unique %>% head(14)
 
 
 ## ----------------------------------------------------------------------------------------------------------------
@@ -24,7 +24,6 @@ observation.matrices.untyped[['150']][1:5,1:5]
 observation.matrices.untyped[[10]] %>% rownames %>% head
 observation.matrices.typed[[emmtype]][['150']][1:5,1:5]
 case.df$`Patient Postcode` %>% unique %>% head(14)
-
 
 
 ## ----------------------------------------------------------------------------------------------------------------
@@ -70,15 +69,15 @@ for (week in weeks){
   emt.factor = emmtype.factor[[emmtype]][cols]
   
   obs.matrix.typed = observation.matrices.typed[[emmtype]][[week]]
-  obs.matrix.untyped = observation.matrices.untyped[[week]] * rep(emt.factor,
-                                                                  rep(NROW(observation.matrices.untyped[[week]]),
-                                                                      NCOL(observation.matrices.untyped[[week]])))
+  obs.matrix.untyped = observation.matrices.untyped[[week]] #* rep(emt.factor,
+                                                                  # rep(NROW(observation.matrices.untyped[[week]]),
+                                                                  #     NCOL(observation.matrices.untyped[[week]])))
   obs.matrix = obs.matrix.typed + obs.matrix.untyped
   
   bsl.matrix.typed = baseline.matrix[,cols] * rep((1 - dly.factor) * emt.factor,
                                                   rep(NROW(baseline.matrix[,cols]),
                                                       NCOL(baseline.matrix[,cols])))
-  bsl.matrix.untyped = baseline.matrix[,cols] * rep(dly.factor * emt.factor,
+  bsl.matrix.untyped = baseline.matrix[,cols] * rep(dly.factor,
                                                     rep(NROW(baseline.matrix[,cols]),
                                                         NCOL(baseline.matrix[,cols])))
   bsl.matrix = bsl.matrix.typed + bsl.matrix.untyped
@@ -89,11 +88,11 @@ for (week in weeks){
                                            obs.matrix.untyped, bsl.matrix.untyped,
                                            emmtype, week.range,
                                            n_cyl, postcode2coord, size_factor = sizefactor)
-  
+  #
   cylinders.strategy2 = ranScanCreateCylinders(obs.matrix, bsl.matrix,
                                      emmtype, week.range,
                                      n_cyl, postcode2coord, size_factor = sizefactor)
-  
+  #
   case.df.tmp = ranScanEvaluate(case.file, cylinders.strategy1, emmtype, p.val.threshold=0.05)
   ws = case.df.tmp[case.df.tmp$emmtype == emmtype,]$warning.score
   i = as.integer(week) - as.integer(weeks[1]) + 1
@@ -109,11 +108,11 @@ for (week in weeks){
 
 dataframe.to.export = cbind(case.df.tmp[case.df.tmp$emmtype == emmtype,], to.export.strategy1)
 dataframe.to.export$warning.score = NULL
-write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '_1_strategy1_delay.csv'))
+write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '_2_strategy1_delay.csv'))
 
 dataframe.to.export = cbind(case.df.tmp[case.df.tmp$emmtype == emmtype,], to.export.strategy2)
 dataframe.to.export$warning.score = NULL
-write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '_1_strategy2_delay.csv'))
+write.csv(dataframe.to.export, file = paste0('emmtype_', emmtype, '_2_strategy2_delay.csv'))
 rm(dataframe.to.export)
 
 

@@ -134,33 +134,33 @@ ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix
       " for emm type ", emmtype, ".\n")
 
   # generate cylinders
-  cylinders.typed = rcylinder2(n.cylinders, observation.matrix.typed, week.range, radia_and_heights, coord.km.df)
-  if (NROW(cylinders.typed) > 0){
-    cylinders.typed[,c('n_obs.typed', 'mu.typed', 'p.val.typed')] = t(apply(cylinders.typed, 1, compute,
+  cylinders = rcylinder2(n.cylinders, observation.matrix.typed + observation.matrix.untyped, week.range, radia_and_heights, coord.km.df)
+  if (NROW(cylinders) > 0){
+    cylinders[,c('n_obs.typed', 'mu.typed', 'p.val.typed')] = t(apply(cylinders, 1, compute,
                                                                 observation.matrix.typed,
                                                                 baseline.matrix.typed,
                                                                 coord.km.df))
-    cylinders.typed[,c('n_obs.untyped', 'mu.untyped', 'p.val.untyped')] = t(apply(cylinders.typed, 1, compute,
+    cylinders[,c('n_obs.untyped', 'mu.untyped', 'p.val.untyped')] = t(apply(cylinders, 1, compute,
                                                                             observation.matrix.untyped,
                                                                             baseline.matrix.untyped,
                                                                             coord.km.df))
   }else{
     cat("No (typed) cases in the selected week range.\n")
   }
-  cylinders.typed$warning = (cylinders.typed$p.val.typed < p.val.threshold) | (cylinders.typed$p.val.untyped < p.val.threshold)
+  cylinders$warning = (cylinders$p.val.typed < p.val.threshold) | (cylinders$p.val.untyped < p.val.threshold)
   print(Sys.time() - init)
-  return(cylinders.typed)
+  return(cylinders)
 }
 
 ranScanPlotCylindersCI<-function(cylinders, confidence.level=0.68, title=NULL){
-  plot(n_obs ~ mu, cylinders, title=title, xlab = 'Expected cases', ylab = 'Observed cases', pch=20, cex=0.8)
-  mu=max(cylinders$mu)
-  lines(0:mu, 0:mu)
-  x = seq(0,mu,0.1)
+  plot(n_obs.typed ~ mu.typed, cylinders, title=title, xlab = 'Expected cases', ylab = 'Observed cases', pch=20, cex=0.8)
+  mu=max(cylinders$mu.typed)
+  lines(0: mu, 0:mu)
+  x = seq(0, mu, 0.1)
   upper=qpois(confidence.level, x)
   lower=qpois(1-confidence.level, x)
   polygon(c(x, x[length(x):1]),c(upper, lower[length(lower):1]), col="#a6a6a666", border = "#a6a6a600")
-  points(cylinders[cylinders$warning,]$mu, cylinders[cylinders$warning,]$n_obs, col='red', pch=20, cex=0.9)
+  points(cylinders[cylinders$warning,]$mu.typed, cylinders[cylinders$warning,]$n_obs.typed, col='red', pch=20, cex=0.9)
 }
 
 ranScanSaveCylinders<-function(cylinders, file.basename){
@@ -191,7 +191,7 @@ ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold = 0.05,
   writeLines(paste0("Computing warning scores for emmtype ", emmtype, "..."))
   case.df[idx, warning.score.name] = apply(case.df[idx,], 1, FUN=warning.score, cylinders, date.time.field)
   writeLines("...Done.")
-  return(case.df)  
+  return(case.df)
 }
 
 
@@ -277,7 +277,7 @@ ranScanCluster<-function(case.df, emmtype, makeplot=FALSE, warning.score='warnin
   X = tsne(case.df[,c('x', 'y', 'SAMPLE_DT_numeric')])
   # palette = colorRampPalette(c('blue', 'red'))(max(case.df$SAMPLE_DT_numeric))
   if (makeplot == TRUE){
-    library(viridis)
+    library(viridisLite)
     palette = viridis(max(case.df$SAMPLE_DT_numeric), begin = 0, end = 1)
     warning.marker = 20 #ifelse(case.df[,warning.score] > 0.9, 20, 1)
     plot(X[,1],X[,2], xlab='C1', ylab='C2', col=palette[case.df$SAMPLE_DT_numeric], pch=warning.marker,
@@ -290,7 +290,7 @@ ranScanCluster<-function(case.df, emmtype, makeplot=FALSE, warning.score='warnin
   return(X)
 }
 
-ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score', ...){
+ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score', legend.pos="bottomleft", ...){
   threshold = 0.95
   idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
   case.df = case.df[idx, ]
@@ -302,7 +302,7 @@ ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score'
   idx2 = (case.df[,warning.score]>0.95)
   points(X[idx2,1], X[idx2,2], cex = 2, col=palette[round(case.df[,warning.score] * 100+1)][idx2])
   
-  pos=legend("bottomleft", c("cases", as.expression(bquote(italic(w) ~ ">" ~ .(threshold)))),
+  pos=legend(legend.pos, c("cases", as.expression(bquote(italic(w) ~ ">" ~ .(threshold)))),
          col = c(palette[as.integer(length(palette)/2)], 'red'), pch=c(19,1), pt.cex = c(1, 2))
 
   points((pos$text$x[2] + pos$rect$left)/2, pos$text$y[2], pch=19, col='red')
@@ -317,11 +317,11 @@ ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score'
   mtext("warning score", side = 4, line = 2)
 }
 
-ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score', threshold=NULL, ...){
+ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score', threshold=NULL, legend.pos="bottomleft", ...){
   if (is.null(threshold)){
-    ranScanPlotCluster0(X, case.df, emmtype, warning.score, ...)
+    ranScanPlotCluster0(X, case.df, emmtype, warning.score, legend.pos, ...)
   }else{
-    library(viridis)
+    library(viridisLite)
     idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
     case.df = case.df[idx, ]
     palette = viridis(max(case.df$SAMPLE_DT_numeric)+1, alpha = 1, begin = 0, end = 1)
@@ -332,14 +332,14 @@ ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score',
     palette = viridis(max(case.df$SAMPLE_DT_numeric), alpha = 1, begin = 0, end = 1)
     idx = ifelse(case.df[,warning.score] > threshold, T, F)
     points(X[idx,1], X[idx,2], xlab='C1', ylab='C2', col='black', pch=1, cex=2)
-    legend("bottomleft", c("cases", as.expression(bquote(italic(w)~ ">" ~ .(threshold)))),
+    legend(legend.pos, c("cases", as.expression(bquote(italic(w)~ ">" ~ .(threshold)))),
            col = c(palette[as.integer(length(palette)/2)], 'black'), pch=c(19,1), pt.cex = c(1, 2))
     
     Cb = matrix(rep(palette, 5), nrow = length(palette), ncol = 5)
     par(fig=c(0.86, 0.88, 0.2, 0.8), new=T)
     par(mar=c(0,0,0,0))
-    plot(c(0, 1), c(1, len(palette)), yaxt='n', xaxt='n', col=NULL, frame.plot=F, ylab='time')
-    rasterImage(Cb[seq(length(palette), 1, -1),], 0, 0, 1, len(palette))
+    plot(c(0, 1), c(1, length(palette)), yaxt='n', xaxt='n', col=NULL, frame.plot=F, ylab='time')
+    rasterImage(Cb[seq(length(palette), 1, -1),], 0, 0, 1, length(palette))
     rect(0, 0, 1, length(palette))
     rr = max(case.df$SAMPLE_DT_numeric)
 #    ticks = as.integer(seq(1, rr, (rr - 1)/ 10))
@@ -351,7 +351,7 @@ ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score',
 
 ranScanPlotCluster3<-function(X, case.df, emmtype,
                               warning.score='warning.score',
-                              threshold=0.95, Legend = T,...){
+                              threshold=0.95, legend.pos="bottomleft", ...){
     idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
     case.df = case.df[idx, ]
     ll = c("East Midlands", "East of England", "London", "North East",
@@ -381,7 +381,7 @@ ranScanPlotCluster3<-function(X, case.df, emmtype,
          col=case.df$color.Region.alpha, pch=19, ...)
 
 
-    idx2 = ifelse(case.df[,warning.score] > threshold, T, F)
+    idx2 = case.df[,warning.score] > threshold
     while((sum(idx2) == 0) & (threshold > 0)){
       threshold = threshold - 0.1
       print(threshold)
@@ -400,12 +400,12 @@ ranScanPlotCluster3<-function(X, case.df, emmtype,
     #          pch = 1, cex=0.7, pt.cex = 1.4)
     # }
     
-    legend('bottomleft',
+    legend(legend.pos,
            c(as.character(sort(unique(case.df$Postcode.Region))),
              as.expression(bquote(italic(w) ~ '>' ~ .(threshold)))),
            col=c(palette.alpha[sort(unique(case.df$Postcode.Region))], 'black'),
-           pch=c(rep(19, len(palette[sort(unique(case.df$Postcode.Region))])), 1),
-           pt.cex = c(rep(1, len(palette[sort(unique(case.df$Postcode.Region))])), 1.4),
+           pch=c(rep(19, length(palette[sort(unique(case.df$Postcode.Region))])), 1),
+           pt.cex = c(rep(1, length(palette[sort(unique(case.df$Postcode.Region))])), 1.4),
            cex=0.7
            )
 }

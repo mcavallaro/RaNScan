@@ -242,17 +242,17 @@ rm(dataframe.to.export)
 
 
 ```{r}
-strategy1_delay = read.csv(paste0('emmtype_', emmtype, '___strategy1_delay.csv'),
+strategy1_1_delay = read.csv(paste0('emmtype_', emmtype, '_2_strategy1_delay.csv'),
                                          row.names = 1, check.names = F)
-plot.spaghetti(strategy1_delay)
-strategy2_delay = read.csv(paste0('emmtype_', emmtype, '___strategy2_delay.csv'),
+plot.spaghetti(strategy1_1_delay)
+strategy2_1_delay = read.csv(paste0('emmtype_', emmtype, '_2_strategy2_delay.csv'),
                                          row.names = 1, check.names = F)
-plot.spaghetti(strategy2_delay)
+plot.spaghetti(strategy2_1_delay)
 ```
 
 
 ```{r}
-plot.strategy.compare(115, strategy1_delay, strategy2_delay,
+plot.strategy.compare(115, strategy1_1_delay, strategy2_1_delay,
                       tab.orange, tab.blue, "strategy 1", "strategy 2", xlim=c(50,142))
 ```
 
@@ -260,78 +260,156 @@ plot.strategy.compare(115, strategy1_delay, strategy2_delay,
 
 ```{r}
 no.delay = read.csv(paste0('emmtype_', emmtype, '___no_delay_receipt.csv'), row.names = 1, check.names = F)
-plot.strategy.compare(115, strategy1_delay, no.delay,
+plot.strategy.compare(115, strategy1_1_delay, no.delay,
                       tab.orange, tab.blue, "with delay", "naive", xlim=c(50,142))
 
 
 ```
 
 ```{r}
-plot.strategy.compare(500, strategy1_delay, no.delay,
+plot.strategy.compare(500, strategy1_1_delay, no.delay,
                       tab.orange, tab.blue, "with delay", "naive", xlim=c(50,110), ylim=c(0.6,1)) #h191320275, h191440186,h191480689
 ```
 
 ```{r}
-plot.strategy.compare(4, strategy2_delay, no.delay,
+plot.strategy.compare(4, strategy2_1_delay, no.delay,
                       tab.orange, tab.blue, "with delay", "naive", xlim=c(1,142), threshold = 0, first.row = 64)
 ```
 
 
+```{r}
+sample_date_scores = read.csv(paste0('emmtype_', emmtype, '_3_strategy1_delay.csv'), row.names = 1, check.names = F)
+# plot.spaghetti(sample_date_scores)
+# insert the scores obtained at sample date in no.delay.
+ROW.NAMES = intersect(row.names(no.delay), row.names(sample_date_scores))
+no.delay. = no.delay[ROW.NAMES,]
+sample_date_scores = sample_date_scores[ROW.NAMES,]
+COL.NAMES = intersect(colnames(no.delay.), colnames(sample_date_scores))
+no.delay. = no.delay.[,COL.NAMES]
+sample_date_scores = sample_date_scores[,COL.NAMES]
+for (j in 16:159){
+  idx = which(sample_date_scores[,j] > 0)
+  no.delay.[idx, j] = sample_date_scores[idx, j]
+}
+plot.strategy.compare(500, no.delay., no.delay,
+                      tab.orange, tab.blue, "no.delay.", "no.delay", xlim=c(50,142))
+
+```
+
 # figure
 
 ```{r}
-png(paste0('Fig/strategy_comparison.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=600, pointsize = 11)
-par(mfrow=c(1,1), mar=c(4,4,1,1))
-s1 = strategy1_delay[which(strategy1_delay$FULLNO=='H191320275'),]
-s2 = strategy2_delay[which(strategy2_delay$FULLNO=='H191320275'),]
-s3 = no.delay[which(no.delay$FULLNO=='H191320275'),]
+png(paste0('Fig/strategy_comparison2.png'), width = 4 * 1.3  * 2, height = 3 * 1.3 * 2, units = 'in', res=600, pointsize = 13)
+par(mfrow=c(2,2), mar=c(4,4,3,3))
+
+at=50
+
+palette = plot.spaghetti(no.delay, xlab='Update week',
+               xlim=c(at,160), ylim=c(0,1),
+               ylab=expression(italic(w)), main='')
+axis(2, at=seq(0,1,0.05), labels=seq(0,1,0.05))
+
+mtext('A', padj=1.5, at = at, cex=2)
+case = 'H191320275'
+s1 = no.delay[which(no.delay$FULLNO==case),]
 x = intersect(intersect(colnames(s1), colnames(s2)), colnames(s3))
 x = x[-(1:16)]
-plot(c(1,length(x)), range(c(s1[x],s2[x],s3[x])),
-     xlab='', ylab='w', type = 'n', xlim=c(71,80)-1, ylim=c(0.4,1), xaxt='n',  cex=0.6)
+plot(c(1,length(x)), range(c(s1[x])), axes=F,
+     xlab='Update week', ylab=expression(italic(w)), type = 'n', xlim=c(71,80)-1, ylim=c(0.65,1), xaxt='n', yaxt='n',  cex=0.6)
+cat(sprintf("Diagnosed on %s - typed on %s", week2Date(s1$SAMPLE_DT_numeric), week2Date(s1$RECEPT_DT_numeric) ))
+abline(h=0.95, col=tab.gray)
+axis(side = 1, at = seq(1,length(x),2), labels = x[seq(1,length(x),2)], cex.axis=0.8, las=1, tck=-0.07)
+axis(side = 1, at = seq(2,length(x),2), labels = x[seq(2,length(x),2)], cex.axis=0.8, las=1,  padj=-1.5)
+axis(2, at=seq(0.4,1,0.05), labels=seq(0.4,1,0.05))
+idx = s1[x] > 0
+lines((1:length(x))[idx],s1[x][idx], col=palette[[case]], lty=1, lwd=1.5)
+points((1:length(x))[idx],s1[x][idx], col=palette[[case]], pch=1, lwd=1.5)
+#
+mtext('B', at=71, padj=1.5, cex=2)
+####################
+
+
+#legend('bottomright', "Observed case", lty=1, col='black')
+t= '285'
+cols = colnames(observation.matrices.untyped[[t]])
+emt.factor = emmtype.factor[[emmtype]][cols]
+dly.factor = delay.factor
+bsl.matrix.typed = baseline.matrix[,cols] * rep((1 - dly.factor) * emt.factor,
+                                                rep(NROW(baseline.matrix[,cols]),
+                                                NCOL(baseline.matrix[,cols])))
+#
+bsl.matrix.untyped = baseline.matrix[,cols] * rep(dly.factor,
+                                                  rep(NROW(baseline.matrix[,cols]),
+                                                  NCOL(baseline.matrix[,cols])))
+#
+x = as.integer(colnames(observation.matrices.typed[[emmtype]][[t]]))
+y = colSums(observation.matrices.typed[[emmtype]][[t]])
+y1 = colSums(observation.matrices.untyped[[t]])
+plot(range(x), c(0, max(c(y,y1))), xlab = "Detection week", ylab='no. cases per week', col=NA, #
+   #  main=sprintf('Snapshot of typed/untyped cases on %s', week2Date(t)),
+     xaxt='n', xlim=c(max(x)-90,max(x)))
+print(sprintf('Snapshot of typed/untyped cases on %s', week2Date(t)))
+mtext('C', at=max(x)-5, padj=1.5, cex=2)
+
+y = ifelse(y > 0, y, NA)
+y1 = ifelse(y1 > 0, y1, NA)
+points(x, y, col=tab.blue, pch=20)
+points(x, y1, col=tab.gray)
+by=1
+axis(1, at=seq(max(x),1, by=-by), labels=NA)
+by=20
+axis(1, at=seq(max(x),1, by=-by), labels=week2Date(seq(max(x),1, by=-by)), tck=-0.05)
+
+#axis(1, seq(0.5, 9.5, 1), labels=rep("", 10), tck=-0.01)
+
+idx = !(rownames(bsl.matrix.typed) == 'NA')
+lines(x, colSums(bsl.matrix.typed[idx,]), col=tab.blue)
+lines(x, colSums(bsl.matrix.untyped[idx,]), col=tab.gray, lty='dotdash')
+
+legend('topleft', legend=c('Typed observations', 'Untyped observations', 'Typed baseline', 'Untyped baseline'), pch=c(20, 1, NA, NA), col=c(tab.blue, tab.gray, tab.blue, tab.gray), lty = c(NA,NA,1,4))
+#legend('topleft', legend=c(sprintf('emm %s observations', emmtype), 'untyped observations', sprintf('emm %s baseline',emmtype), 'untyped baseline'), pch=c(20, 1, NA, NA), col=c(tab.blue, tab.gray, tab.blue, tab.gray), lty = c(NA,NA,1,4))
+
+
+
+##############
+s1 = no.delay[which(no.delay$FULLNO=='H191480689'),]
+s2 = no.delay.[which(no.delay.$FULLNO=='H191480689'),]
+x = intersect(intersect(colnames(s1), colnames(s2)), colnames(s3))
+x = x[-(1:16)]
+plot(c(1,length(x)), range(c(s1[x],s2[x])),
+     xlab='Update week', ylab=expression(italic(w)), type = 'n', axes=F,
+     xlim=c(71,80), ylim=c(0.75,1), xaxt='n', yaxt='n', cex=0.6)
 cat(sprintf("Sampled on %s - typed on %s", week2Date(s1$SAMPLE_DT_numeric), week2Date(s1$RECEPT_DT_numeric) ))
 abline(h=0.95, col=tab.gray)
 axis(side = 1, at = seq(1,length(x),2), labels = x[seq(1,length(x),2)], cex.axis=0.8, las=1, tck=-0.07)
 axis(side = 1, at = seq(2,length(x),2), labels = x[seq(2,length(x),2)], cex.axis=0.8, las=1,  padj=-1.5)
+axis(2, at=seq(0.4,1,0.05), labels=seq(0.4,1,0.05))
 
-idx = s1[x] > 0
-lines((1:length(x))[idx],s1[x][idx], col=tab.blue, lty=1)
-points((1:length(x))[idx],s1[x][idx], col=tab.blue, pch=1)
-idx = s2[x] > 0
-lines((1:length(x))[idx],s2[x][idx], col=tab.orange, lty=2)
-points((1:length(x))[idx],s2[x][idx], col=tab.orange, pch=2)
-idx = s3[x] > 0
-lines((1:length(x))[idx],s3[x][idx], col=tab.green, lty=3)
-points((1:length(x))[idx],s3[x][idx], col=tab.green, pch=3)
-legend("bottomright", c("Strategy 1", "Strategy 2", "Naive"),
-       lty=c(1,2,3), pch=c(1,2,3), col=c(tab.blue, tab.orange, tab.green))
-dev.off()
+cases = c('H191480689','H191640562','H191740898')
+for (i in 1:length(cases)){
+  case = cases[i]
+  print(case)
+  s1 = no.delay[which(no.delay$FULLNO==case),]
+  s2 = no.delay.[which(no.delay.$FULLNO==case),]
+  idx = s2[x] > 0
+  lines((1:length(x))[idx][1:2],s2[x][idx][1:2], col=tab.gray, lty=i+1 , lwd=1.4)
+  points((1:length(x))[idx][1:2], s2[x][idx][1:2], col=tab.gray, pch=i+1, lwd=1.4)
+  
+  idx = s1[x] > 0
+  lines((1:length(x))[idx],s1[x][idx], col=palette[[case]], lty=i+1, lwd=1.5)
+  points((1:length(x))[idx],s1[x][idx], col=palette[[case]], pch=i+1, lwd=1.5)
+}
 
-png(paste0('Fig/strategy_comparison_2.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=600, pointsize = 11)
-par(mfrow=c(1,1), mar=c(4,4,1,1))
-s1 = strategy1_delay[which(strategy1_delay$FULLNO=='H191480689'),]
-s2 = strategy2_delay[which(strategy2_delay$FULLNO=='H191480689'),]
-s3 = no.delay[which(no.delay$FULLNO=='H191480689'),]
-x = intersect(intersect(colnames(s1), colnames(s2)), colnames(s3))
-x = x[-(1:16)]
-plot(c(1,length(x)), range(c(s1[x],s2[x],s3[x])),
-     xlab='', ylab='w', type = 'n', xlim=c(71,80), ylim=c(0.6,1), xaxt='n',  cex=0.6)
-cat(sprintf("Sampled on %s - typed on %s", week2Date(s1$SAMPLE_DT_numeric), week2Date(s1$RECEPT_DT_numeric) ))
-abline(h=0.95, col=tab.gray)
-axis(side = 1, at = seq(1,length(x),2), labels = x[seq(1,length(x),2)], cex.axis=0.8, las=1, tck=-0.07)
-axis(side = 1, at = seq(2,length(x),2), labels = x[seq(2,length(x),2)], cex.axis=0.8, las=1,  padj=-1.5)
+legend("bottomright", c("Typed", "Untyped", 'Case 1', 'Case 2', 'Case 3'),
+       fill=c(NA, NA, NA, NA, NA), border=NA,
+       lty=c(NA,NA, 2, 3, 4), pch=c(1, 1, 2, 3, 4), col=c(NA, NA, 'black', 'black', 'black'))
 
-idx = s1[x] > 0
-lines((1:length(x))[idx],s1[x][idx], col=tab.blue, lty=1)
-points((1:length(x))[idx],s1[x][idx], col=tab.blue, pch=1)
-idx = s2[x] > 0
-lines((1:length(x))[idx],s2[x][idx], col=tab.orange, lty=2)
-points((1:length(x))[idx],s2[x][idx], col=tab.orange, pch=2)
-idx = s3[x] > 0
-lines((1:length(x))[idx],s3[x][idx], col=tab.green, lty=3)
-points((1:length(x))[idx],s3[x][idx], col=tab.green, pch=3)
-legend("bottomright", c("Strategy 1", "Strategy 2", "Naive"),
-       lty=c(1,2,3), pch=c(1,2,3), col=c(tab.blue, tab.orange, tab.green))
+polygon(c(8.5,8.5,8.75,8.75)  + 69.1, c(0.8,0.81,0.81,0.8) +0.027, col = palette[[cases[1]]], border=F)
+polygon(c(8.5,8.5,8.75,8.75)  + 69.35, c(0.8,0.81,0.81,0.8) +0.027, col = palette[[cases[2]]], border=F)
+polygon(c(8.5,8.5,8.75,8.75)  + 69.6, c(0.8,0.81,0.81,0.8) +0.027, col = palette[[cases[3]]], border=F)
+polygon(c(8.5,8.5,8.75+0.5,8.75+0.5)+ 69.1, c(0.8,0.81,0.81,0.8) +0.007, col = tab.gray, border=F)
+
+mtext('D', at=72, padj=1.5, cex=2)
 dev.off()
 ```
 

@@ -50,7 +50,7 @@ to.export = as.data.frame(matrix(NA, nrow = n.rows, ncol = n.cols))
 names(to.export) = mapply(function(x){week2Date(x)}, as.character(weeks))
 #
 for (week in weeks){
-  week.min = max(0, week - 200)
+  week.min = max(0, week - 150)
   week.range = as.character(week.min:week)
   cat('weeks:', range(as.integer(week.range)),'\t')
 
