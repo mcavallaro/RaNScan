@@ -42,6 +42,7 @@ ranScanPlotCluster3(tmp.94, case.df.tmp1, emmtype,
                     xlim=c(-50, 25), threshold = 0.95)
 dev.off()
 
+
 idxw = case.df.tmp1$warning.score >= 0.95
 palette = plasma(max(case.df.tmp1[idxw,]$SAMPLE_DT_numeric)+1 - min(case.df.tmp1[idxw,]$SAMPLE_DT_numeric), begin = 0, end = 0.75)
 
