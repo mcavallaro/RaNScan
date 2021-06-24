@@ -60,22 +60,42 @@ plot.emm.fraction<-function(case.df, emmtypes, legend.position='topright', ...){
 }
 
 
-
-plot.spaghetti<-function(prospective.w.df, spaghetti.col='black', ...){
+plot.spaghetti<-function(prospective.w.df, ...){
   cols = 16:NCOL(prospective.w.df)
+  idx = prospective.w.df[,NCOL(prospective.w.df)] > 0.95
+  R = range( prospective.w.df[idx, 'SAMPLE_DT_numeric'])
+  palette=inferno(length(R[1]:R[2]), begin=0.2, end=0.75, direction=-1)
   x = 1:len(cols)
-  plot(range(x), c(0.5,1), type='n', xaxt='n', ...)
+  plot(range(x), c(0,1), type='n', xaxt='n', yaxt='n', axes = FALSE, ...)
+  ret = list()
+  abline(h=0.95, col="#7f7f7f")
   for (i in 1:2300){
     if( !is.na(prospective.w.df[i,'x'])){
       y = unlist(prospective.w.df[i, cols])
       idx = which(y>0)
-      
-      lines(x[idx], y[idx], col=spaghetti.col)
+      if(length(idx) > 0){
+        if(idx[length(idx)] < length(y)){
+          idx. = idx[length(idx)] + 1
+          idx = c(idx,idx.)
+        }        
+      }
+      if( y[length(y)] > 0.95){
+        I = prospective.w.df[i, "SAMPLE_DT_numeric"] - R[1] + 1
+        color = palette[I]
+        print(c(I, color, as.character(prospective.w.df[i, "FULLNO"])))
+        ret[[as.character(prospective.w.df[i, "FULLNO"])]] = color
+      }else{
+        color = 'black'
+      }
+      lines(x[idx], y[idx], col=color)
       
     }
   }
-  axis(side = 1, at = x, labels = colnames(prospective.w.df)[cols])
-  abline(h=0.95)
+  by=1
+  axis(1, at=seq(max(x),1, by=-by), labels=NA)
+  by=20
+  axis(1, at=seq(max(x),1, by=-by), labels=colnames(prospective.w.df)[cols][seq(max(x),1, by=-by)], tck=-0.05)
+  return(ret)
 }
 
 plot.strategy.compare<-function(n.rows, prospective.w.df1, prospective.w.df2,

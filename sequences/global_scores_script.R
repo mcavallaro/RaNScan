@@ -57,3 +57,15 @@ for (i in 1:length(emmtypes)){
 
 
 global.scores = data.frame(emmtype = as.character(emmtypes), global.score = global.scores)
+
+
+global.scores$emmtype = as.character(global.scores$emmtype)
+global.scores$prevalence = apply(global.scores, 1, function(x){sum(case.df$emmtype == x['emmtype'])}) / sum(postcode2coord$Total, na.rm=T)
+global.scores$fraction = global.scores$prevalence / sum(global.scores$prevalence)
+
+idx=order(global.scores$global.score, decreasing = T)
+
+write.table(global.scores[idx,], file = "~/Outbreak/sequences/global_scores.csv", quote = F, sep = ",", row.names = F, col.names = TRUE)
+
+
+

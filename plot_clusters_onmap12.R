@@ -1,3 +1,7 @@
+source('ranScanInit2.R')
+source('ranScanEvaluate.R')
+source("plotBaseMap.r")
+len=length
 
 emmtype = '12.0'
 

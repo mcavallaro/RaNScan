@@ -27,8 +27,12 @@ Wales. = st_union(UK[UK$NAME_1=='Wales',])
 
 
 
-plotBaseMap<-function(main=NULL, add=T, Wales=TRUE, ...){
-  plot(st_geometry(UK), col=NA, border='#e2e2e288', lwd=0.8,  add=add,...)
+plotBaseMap<-function(main=NULL, add=T, Wales=TRUE, onlyregion=F,...){
+  if (onlyregion){
+    plot(st_geometry(UK), col=NA, border='white', lwd=0.8,  add=add,...)
+  }else{
+    plot(st_geometry(UK), col=NA, border='#e2e2e288', lwd=0.8,  add=add,...)    
+  }
   if (Wales){
     plot(st_geometry(Wales.), axes=F, border='black', lwd=1, add=T)    
   }
