@@ -1,5 +1,5 @@
 ## ----include=FALSE-----------------------------------------------------------------------------------------------
-source("ranScanInit2.r")
+source("Init2.r")
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
 case.df = ranScanInit(case.file)
 

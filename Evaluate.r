@@ -24,7 +24,7 @@ source("plot_utils.R")
 #' @param n.cylinders (integer) number of proposed cylinders per week interval.
 #' @param rs
 #' @param p.val.threshold
-ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
+CreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
                                  week.range, n.cylinders=1000, rs=0.1,
                                  p.val.threshold=0.05, coord.df=postcode2coord, size_factor=1){
   observation.matrix = observation.matrix[!(rownames(observation.matrix) == 'NA'),]
@@ -40,7 +40,7 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
     print(sum(observation.matrix))    
     warning(
       sprintf(
-        "Warning: the baseline is too high. Have you multiplied for the emmtype factor? e.g., `ranScanCreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['%s']], '%s', %d:%d, n.cylinders=100, rs=0.1)`", emmtype, emmtype, as.integer(week.range[1]), as.integer(week.range[2])
+        "Warning: the baseline is too high. Have you multiplied for the emmtype factor? e.g., `CreateCylinders(observation.matrix, baseline.matrix*emmtype.factor[['%s']], '%s', %d:%d, n.cylinders=100, rs=0.1)`", emmtype, emmtype, as.integer(week.range[1]), as.integer(week.range[2])
       )
     )
   }
@@ -80,6 +80,8 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
   return(cylinders)
 }
 
+ranScanCreateCylinders<-CreateCylinders
+
 
 #' 
 #' n.cylinders=10000 takes around 3 hours for the whole dataset, to end up with 300 non-empty cylinders
@@ -90,7 +92,7 @@ ranScanCreateCylinders<-function(observation.matrix, baseline.matrix, emmtype,
 #' @param observation.matrix.untyped
 #' @param baseline.matrix.untyped
 #' 
-ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix.typed,
+CreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix.typed,
                                  observation.matrix.untyped, baseline.matrix.untyped,
                                  emmtype,
                                  week.range, n.cylinders=1000, rs=0.1,
@@ -152,7 +154,10 @@ ranScanCreateCylinders.delay<-function(observation.matrix.typed, baseline.matrix
   return(cylinders)
 }
 
-ranScanPlotCylindersCI<-function(cylinders, confidence.level=0.68, title=NULL){
+ranScanCreateCylinders.delay<-CreateCylinders.delay
+
+
+PlotCylindersCI<-function(cylinders, confidence.level=0.68, title=NULL){
   plot(n_obs.typed ~ mu.typed, cylinders, title=title, xlab = 'Expected cases', ylab = 'Observed cases', pch=20, cex=0.8)
   mu=max(cylinders$mu.typed)
   lines(0: mu, 0:mu)
@@ -163,12 +168,16 @@ ranScanPlotCylindersCI<-function(cylinders, confidence.level=0.68, title=NULL){
   points(cylinders[cylinders$warning,]$mu.typed, cylinders[cylinders$warning,]$n_obs.typed, col='red', pch=20, cex=0.9)
 }
 
-ranScanSaveCylinders<-function(cylinders, file.basename){
+ranScanPlotCylindersCI<-PlotCylindersCI
+
+SaveCylinders<-function(cylinders, file.basename){
   write.csv(cylinders, paste0(file.basename,'.csv'), quote = F, row.names = F)
   save.and.tell("cylinders", file = paste0(file.basename,'.Rdata'))
 }
 
-ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold = 0.05,
+ranScanSaveCylinders<-SaveCylinders
+
+Evaluate<-function(case.file, cylinders, emmtype, p.val.threshold = 0.05,
                           warning.score.name = 'warning.score', date.time.field = 'SAMPLE_DT_numeric'){
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
@@ -194,7 +203,7 @@ ranScanEvaluate<-function(case.file, cylinders, emmtype, p.val.threshold = 0.05,
   return(case.df)
 }
 
-
+ranScanEvaluate<-Evaluate
 
 plotBaseline<-function(week, emmtype, z, add=F, tf=factor, emmf=emmtype.factor){
   xmax=max(z$fhat) * tf[week] * emmf[emmtype][[1]]
@@ -261,7 +270,7 @@ plotBaseline<-function(week, emmtype, z, add=F, tf=factor, emmf=emmtype.factor){
 # }
 
 
-ranScanCluster<-function(case.df, emmtype, makeplot=FALSE, warning.score='warning.score'){
+Cluster<-function(case.df, emmtype, makeplot=FALSE, warning.score='warning.score'){
   library(tsne)
   # idx = rownames(observation.matrix) != 'NA'
   # observation.matrix = observation.matrix[idx,]
@@ -290,7 +299,9 @@ ranScanCluster<-function(case.df, emmtype, makeplot=FALSE, warning.score='warnin
   return(X)
 }
 
-ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score', legend.pos="bottomleft", ...){
+ranScanCluster<-Cluster
+
+PlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score', legend.pos="bottomleft", ...){
   threshold = 0.95
   idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
   case.df = case.df[idx, ]
@@ -317,9 +328,11 @@ ranScanPlotCluster0<-function(X, case.df, emmtype, warning.score='warning.score'
   mtext("warning score", side = 4, line = 2)
 }
 
-ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score', threshold=NULL, legend.pos="bottomleft", ...){
+ranScanPlotCluster0<-PlotCluster0
+
+PlotCluster<-function(X, case.df, emmtype, warning.score='warning.score', threshold=NULL, legend.pos="bottomleft", ...){
   if (is.null(threshold)){
-    ranScanPlotCluster0(X, case.df, emmtype, warning.score, legend.pos, ...)
+    PlotCluster0(X, case.df, emmtype, warning.score, legend.pos, ...)
   }else{
     library(viridisLite)
     idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
@@ -349,7 +362,10 @@ ranScanPlotCluster<-function(X, case.df, emmtype, warning.score='warning.score',
   }
 }
 
-ranScanPlotCluster3<-function(X, case.df, emmtype,
+ranScanPlotCluster<-PlotCluster
+
+
+PlotCluster3<-function(X, case.df, emmtype,
                               warning.score='warning.score',
                               threshold=0.95, legend.pos="bottomleft", ...){
     idx = ((case.df$emmtype == emmtype) & !is.na(case.df$x))
@@ -409,3 +425,6 @@ ranScanPlotCluster3<-function(X, case.df, emmtype,
            cex=0.7
            )
 }
+
+ranScanPlotCluster3<-PlotCluster3
+

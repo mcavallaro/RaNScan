@@ -18,7 +18,7 @@ tab.cyan = "#17becf"
 # "TF2 9AT"  "TA9 3AN"  "OL11 1JZ" "M9 8WA"   "WN5 0EH"  "TR14 0BH" "BN6 8HH"  "BN2 6WA"  "IP14 6DT"
 # [10] "BL5 2LU"  "CA28 7TN" "SK17 7AF" "NA"       "L39 4RS" 
 
-ranScanInit<-function(case.file){ #}, postcode.file=default.postcode.file){
+Init<-function(case.file){ #}, postcode.file=default.postcode.file){
     source("utils.R")
     case.df<-tryCatch({
       ""
@@ -106,14 +106,17 @@ ranScanInit<-function(case.file){ #}, postcode.file=default.postcode.file){
     )
 }
 
-ranScanClean<-function(pattern){
+ranScanInit<-Init
+
+Clean<-function(pattern){
   list_files = list.files('Data',pattern = paste0(pattern, '.Rdata'))
   for (file in list_files){
     file.remove(file.path("Data", file))
   }
 }
+ranScanClean<-Clean
 
-ranScanCreateObservationMatrices<-function(case.file, emmtypes, date.time.field = 'SAMPLE_DT_numeric'){
+CreateObservationMatrices<-function(case.file, emmtypes, date.time.field = 'SAMPLE_DT_numeric'){
   # emmtype is an vector of strings, e.g., 
   library(Matrix)
   case.df<-tryCatch({
@@ -159,7 +162,10 @@ ranScanCreateObservationMatrices<-function(case.file, emmtypes, date.time.field 
   }
 }
 
-ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, n.weeks){
+
+ranScanCreateObservationMatrices<-CreateObservationMatrices
+
+CreateObservationMatrices_<-function(case.file, emmtypes, starting.week, n.weeks){
   #' This function rearranges the observation of `case.file` into observation Matrices
   #' similarly to `ranScanCreateObservationMatrices` with the difference that a) it
   #' creates matrices for each week starting from `starting.week` until the last week in the dataset
@@ -282,6 +288,7 @@ ranScanCreateObservationMatrices_<-function(case.file, emmtypes, starting.week, 
 }
 
 
+ranScanCreateObservationMatrices_<-CreateObservationMatrices_
 ranScanCreateObservationMatrices.delay<-ranScanCreateObservationMatrices_
 
 #' ranScanCreateObservationMatrices.prospective<-function(case.file, emmtypes, n.weeks){
@@ -379,7 +386,7 @@ ranScanCreateObservationMatrices.delay<-ranScanCreateObservationMatrices_
 #' }
 #' 
 
-ranScanPostcodeMap<-function(observation.matrix, postcode.file.name=postcode.file){
+PostcodeMap<-function(observation.matrix, postcode.file.name=postcode.file){
   # Create a dataframe that maps postcodes to coordinates
   writeLines("Compiling the table that maps the rows of the observation matrix to geo-coordinates and population.")
   source("utils.R")
@@ -408,8 +415,9 @@ ranScanPostcodeMap<-function(observation.matrix, postcode.file.name=postcode.fil
   )
   return(ret)
 }
+PostcodeMap<-ranScanPostcodeMap
 
-ranScanTimeFactor<-function(case.file, save.on.disk = TRUE, date.time.field = "SAMPLE_DT_numeric", parameters = NULL){
+TimeFactor<-function(case.file, save.on.disk = TRUE, date.time.field = "SAMPLE_DT_numeric", parameters = NULL){
   case.df<-tryCatch({
     load(paste0(case.file, ".Rdata"))
     case.df
@@ -450,7 +458,10 @@ ranScanTimeFactor<-function(case.file, save.on.disk = TRUE, date.time.field = "S
   return(time.factor)
 }
 
-ranScanEmmtypeFactor<-function(case.file){
+
+ranScanTimeFactor<-TimeFactor
+
+EmmtypeFactor<-function(case.file){
   load(paste0(case.file, ".Rdata"))
   emmtype.factor = c(table(case.df$emmtype))
   emmtype.factor = emmtype.factor/ sum(emmtype.factor)
@@ -462,7 +473,9 @@ ranScanEmmtypeFactor<-function(case.file){
   return(xy.list)
 }
 
-ranScanEmmtypeFactor.tau<-function(case.file, emmtypes, date.time.field = 'SAMPLE_DT_numeric'){
+ranScanEmmtypeFactor<-EmmtypeFactor
+
+EmmtypeFactor.tau<-function(case.file, emmtypes, date.time.field = 'SAMPLE_DT_numeric'){
   load(paste0(case.file, ".Rdata"))
   n.weeks = max(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) - min(case.df[,date.time.field][!is.na(case.df[,date.time.field])]) + 1
 
@@ -482,12 +495,14 @@ ranScanEmmtypeFactor.tau<-function(case.file, emmtypes, date.time.field = 'SAMPL
   return(xy.list)
 }
 
+ranScanEmmtypeFactor.tau<-EmmtypeFactor.tau
+
 #' At a given week, a fraction lambda_untyped \approx 0.6 of all cases are not typed.
 #' the baselines e.g. are as follows:
 #' - for the emmtype 33.0: (1-lambda_untyped) * lambda_33.0 * lambda_t * lambda_geo
 #' - for the entyped: lambda_untyped * lambda_t * lambda_geo
 #' 
-ranScanEmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
+EmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
   if (starting.week < n.weeks){
     starting.week = n.weeks
     cat(sprintf("We enforced `starting.week=n.week=%d`", n.weeks), ".\n")
@@ -520,7 +535,10 @@ ranScanEmmtypeFactor.delay_<-function(case.file, starting.week, n.weeks){
   return(tmp)
 }
 
-ranScanCreateBaselineMatrix<-function(case.file, save.on.disk=FALSE, date.time.field='SAMPLE_DT_numeric'){
+
+ranScanEmmtypeFactor.delay_<-EmmtypeFactor.delay_
+
+CreateBaselineMatrix<-function(case.file, save.on.disk=FALSE, date.time.field='SAMPLE_DT_numeric'){
   
   # emmtype is an vector of strings, e.g., 
   case.df<-tryCatch({
@@ -566,5 +584,7 @@ ranScanCreateBaselineMatrix<-function(case.file, save.on.disk=FALSE, date.time.f
   }
   return(baseline.matrix)
 }
+
+ranScanCreateBaselineMatrix<-CreateBaselineMatrix
 
 

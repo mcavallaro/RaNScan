@@ -1,7 +1,7 @@
 source("utils.R")
 library(sf)
 library(spatstat)
-
+ 
 A=st_read("shape_file_new/Areas.shp")
 
 plot_map<-function(X.range, Y.range, main=NULL){
