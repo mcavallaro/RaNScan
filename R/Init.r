@@ -5,7 +5,6 @@ source("utils.R")
 case.file="Data/Full MOLIS dataset minus PII 20200918.xlsx"
 
 ranScanInit<-function(case.file){ #}, postcode.file=default.postcode.file){
-    source("utils.R")
     case.df = read_excel(case.file)
     case.df = as.data.frame(case.df)
     nomi = c("FULLNO", "Patient Postcode", "SAMPLE_DT", "RECEPT_DT", "Isolation Site Decoded", "Sterile Site Y N",

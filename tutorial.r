@@ -1,6 +1,6 @@
 
 # INITIALISE:
-source("ranScanInit.r")
+source("Init.r")
 
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
 
@@ -79,7 +79,7 @@ for(sizefactor in c(1.3)){
 
 emmtype = '33.0'
 load(paste0("~/Outbreak/Data/", emmtype, "_obs.Rdata"))
-load(paste0("~/Outbreak/Data/mutcylinders_for_",emmtype,".csv.Rdata"))
+#load(paste0("~/Outbreak/Data/mutcylinders_for_",emmtype,".csv.Rdata"))
 cidx = !(row.names(observation.matrix) == 'NA')
 ranScanMovie(cylinders, observation.matrix[idx,], postcode2coord, 'Fig/2Dec', emmtype)
 
@@ -108,11 +108,13 @@ cat(date2week("2018-02-23"), date2week("2019-05-07"))
 # 203-274 108.1
 # 164-226 108.1
 
-png('Fig/prevalence.png', res=600, width=5 * 2, height=4, units="in")
+png('Fig/prevalence_.png', res=600, width=5 * 2, height=4, units="in")
+cols = c("#1f77b4", "#ff7f0e", "#2ca02c",
+         "#d62728","#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
 par(mfrow=c(1, 2)) #, mar=c(0.9,0.9,0.9,0.7))
-plot.emm.fraction(case.df , c('1.0', '89.0', '12.0'), 'topleft', ylim=c(0,0.51))
-mtext('A', 3, at = max(case.df$SAMPLE_DT), cex=2, padj=1.5)
-plot.emm.fraction(case.df , c('33.0', '108.1', '44.0', '94.0'), 'topleft', ylim=c(0,0.06))
-mtext('B', 3, at = max(case.df$SAMPLE_DT), cex=2, padj=1.5)
+plot.emm.fraction(tmp$case.df, c('1.0', '89.0', '12.0'), cols=cols[1:3], 'topleft', ylim=c(0,0.51), xlab=expression(tau))
+mtext('A', 3, at = max(tmp$case.df$SAMPLE_DT), cex=2, padj=1.5)
+plot.emm.fraction(tmp$case.df, c('33.0', '108.1', '44.0', '94.0'),cols=cols[c(4,5,6,8)], 'topleft', ylim=c(0,0.06),xlab=expression(tau))
+mtext('B', 3, at = max(tmp$case.df$SAMPLE_DT), cex=2, padj=1.5)
 dev.off()
 
