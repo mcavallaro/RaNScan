@@ -415,7 +415,8 @@ PostcodeMap<-function(observation.matrix, postcode.file.name=postcode.file){
   )
   return(ret)
 }
-PostcodeMap<-ranScanPostcodeMap
+
+ranScanPostcodeMap<-PostcodeMap
 
 TimeFactor<-function(case.file, save.on.disk = TRUE, date.time.field = "SAMPLE_DT_numeric", parameters = NULL){
   case.df<-tryCatch({

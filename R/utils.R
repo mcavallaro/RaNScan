@@ -181,7 +181,7 @@ vkm2latlong<-function(yx){
 }
 
 
-ranScanSimulate<-function(population, time.factor, total.average){
+Simulate<-function(population, time.factor, total.average){
   #
   #' @param population
   #' @param time.factor
@@ -200,5 +200,5 @@ ranScanSimulate<-function(population, time.factor, total.average){
 
 
 
-
+ranScanSimulate<-Simulate
 

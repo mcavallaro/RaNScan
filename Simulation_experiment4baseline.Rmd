@@ -11,8 +11,8 @@ label.str = paste(as.character(size_factor_epi), as.character(n.endemic_cases), 
 
 
 ```{r include=FALSE}
-source('utils.R')
-source("ranScanEvaluate.r")
+source('R/utils.R')
+source("R/Evaluate.r")
 ```
 
 
@@ -38,7 +38,7 @@ set.seed(1)
 idx=sort(sample(length(population), 10000))
 sample.population = population[idx]
 # simulate the cases. 
-sim=ranScanSimulate(sample.population, time.factor[-1][1:100], n.endemic_cases)
+sim=Simulate(sample.population, time.factor[-1][1:100], n.endemic_cases)
 ```
 
 
@@ -93,21 +93,15 @@ plot(40:59, colSums(epi.matrix), col=ifelse(colSums(epi.matrix) > 0,'#d62728','w
 
 Aggregate epidemic and endemic cases and plot. It is worth noting that it is essentially impossible to visually detect the epidemic element from these aggregate data.
 
+```{r message=FALSE, warning=FALSE, include=FALSE}
+source('R/plotBaseMap.r')
+```
+
 ```{r}
-#print(sum(sim))
 sim2 = sim
 sim2[1:21, as.character(40:59)] = sim2[1:21, as.character(40:59)] + epi.matrix
 
-# par(mfrow = c(1, 2))
-# plot(colSums(sim), xlab='t', col='#1f77b4', pch=20, ylab='no. cases', main='endemic')
-# lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
-# mtext('A', side=3, padj=2, at=95, cex=2)
-# plot(colSums(sim2), pch=20, xlab='t', main='endemic + epidemic',  ylab='no. cases')
-# lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
-# mtext('B', side=3, padj=2, at=95, cex=2)
-
-
-png(paste0('Fig/end_epi_panel_',label.str,'.png'), width = 4 * 1.2 * 2, height = 3 * 1.2 * 2, units = 'in', res=400, pointsize = 13)
+# png(paste0('Fig/end_epi_panel_',label.str,'.png'), width = 4 * 1.2 * 2, height = 3 * 1.2 * 2, units = 'in', res=400, pointsize = 13)
 par(mfrow = c(2, 2), mar=c(4,4,1,1)+0.1)
 plot(colSums(sim), xlab='t', col='#1f77b4', pch=20, ylab='no. cases', main='endemic')
 lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
@@ -123,18 +117,7 @@ df.cases2 = cbind(rownames(geo.location[idx,]), df.cases2)
 colnames(df.cases2) = c('Postcode','latitude', 'longitude', 'n.cases')
 df2 = data.frame(longitude = rep(df.cases2[,'longitude'], df.cases2[,'n.cases']),
              latitude = rep(df.cases2[,'latitude'], df.cases2[,'n.cases']))
-# 
-# par(mfrow = c(1, 2))
-# plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic')
-# #plotBaseMap(add=T, Wales=F)
-# mtext('A', side=3, padj=2, at=1, cex=2)
-# 
-# plot(df2$longitude, df2$latitude, axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, ylim = c(50,56), main='endemic + epidemic')
-# #plotBaseMap(add=T, Wales=F)
-# mtext('B', side=3, padj=2, at=1, cex=2)
 
-#png(paste0('Fig/end_epi_spatial1_', label.str, '.png'), width = 4 * 1.2 * 2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
-#par(mfrow = c(1, 2), mar=c(1,1,2,1)+0.1)
 plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, ylab=NA, main='endemic', ylim = c(50,56))
 plotBaseMap(add=T, Wales=F)
 mtext('C', side=3, padj=2, at=1, cex=2)
@@ -143,13 +126,13 @@ plot(df2$longitude, df2$latitude,axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, main
 plotBaseMap(add=T, Wales=F)
 mtext('D', side=3, padj=2, at=1, cex=2)
 
-dev.off()
+# dev.off()
 rm(df2)
 ```
 
 
 
-Apply RaNScan. The matrix data must be converted in list data (as the iGAS dataset).
+Apply RaNCover. The matrix data must be converted to list data (as in the iGAS dataset).
 ```{r}
 case.df = as.data.frame(which(sim2 == 1, arr.ind = TRUE))
 case.df$postcode = rownames(sim2)[case.df$row]
@@ -175,13 +158,13 @@ b.matrix = b.matrix / sum(b.matrix) * n.endemic_cases
 ```{r}
 set.seed(1)
 start_time <- Sys.time()
-cylinders = ranScanCreateCylinders(observation.matrix = sim2, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.2)
+cylinders = CreateCylinders(observation.matrix = sim2, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.2)
 
-set.seed(1)
-cylinders2 = ranScanCreateCylinders(observation.matrix = sim2, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.5)
+# set.seed(1)
+# cylinders2 = CreateCylinders(observation.matrix = sim2, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.5)
 
 case.df[,'warning.score'] = apply(case.df, 1, FUN=warning.score, cylinders)
-case.df[,'warning.score2'] = apply(case.df, 1, FUN=warning.score, cylinders2)
+#case.df[,'warning.score2'] = apply(case.df, 1, FUN=warning.score, cylinders2)
 
 cat("estimate of computation time:","\n")
 print((Sys.time() - start_time)/2)
@@ -223,7 +206,7 @@ case.df %>% head
 
 
 
-```{r}
+```{r message=TRUE, warning=FALSE}
 library(pROC)
 ROC = roc(case.df$true_positive, case.df$warning.score)
 print(ROC)
