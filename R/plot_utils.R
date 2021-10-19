@@ -37,14 +37,16 @@ scale2one<-function(x){
 }
 
 
-plot.emm.fraction<-function(case.df, emmtypes, legend.position='topright', ...){
+plot.emm.fraction<-function(case.df, emmtypes, legend.position='topright', cols=NULL, ...){
   case.df.ordered = case.df[order(case.df$SAMPLE_DT_numeric),]
   case.df.ordered$cum.cases = 1:nrow(case.df)
   ylab = expression(lambda[m])
   y = 0
   lwd = 2
   l = length(emmtypes)
-  cols = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+  if (is.null(cols)){
+    cols = c("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf")
+  }
   for (i in 1:l){
     emmtype = emmtypes[i]
     y = c(y, range(cumsum(case.df.ordered$emmtype == emmtype)  / case.df.ordered$cum.cases))
