@@ -91,15 +91,16 @@ plot(40:59, colSums(epi.matrix), col=ifelse(colSums(epi.matrix) > 0,'#d62728','w
 ```
 
 
-Aggregate epidemic and endemic cases and plot. It is worth noting that it is essentially impossible to visually detect the epidemic element from these aggregate data.
-
-```{r message=FALSE, warning=FALSE, include=FALSE}
-source('R/plotBaseMap.r')
-```
-
+Aggregate epidemic and endemic cases:
 ```{r}
 sim2 = sim
-sim2[1:21, as.character(40:59)] = sim2[1:21, as.character(40:59)] + epi.matrix
+sim2[1:sum(idx1), as.character(40:59)] = sim2[1:sum(idx1), as.character(40:59)] + epi.matrix
+```
+
+...and plot. This shows that is essentially impossible to visually detect the epidemic element from these aggregate data. The following code requires UK boundaries shape files, not sure if sharing is allowed.
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+source('R/plotBaseMap.r')
 
 # png(paste0('Fig/end_epi_panel_',label.str,'.png'), width = 4 * 1.2 * 2, height = 3 * 1.2 * 2, units = 'in', res=400, pointsize = 13)
 par(mfrow = c(2, 2), mar=c(4,4,1,1)+0.1)
@@ -109,7 +110,6 @@ mtext('A', side=3, padj=2, at=95, cex=2)
 plot(colSums(sim2), pch=20, xlab='t', main='endemic + epidemic',  ylab='no. cases')
 lines(time.factor[-1][1:100] * n.endemic_cases / sum(time.factor[-1][1:100]), col='#1f77b4')
 mtext('B', side=3, padj=2, at=95, cex=2)
-
 
 df.cases2 = cbind(geo.location[idx,], rowSums(sim2))
 df.cases2 = as.data.frame(df.cases2)
@@ -132,7 +132,7 @@ rm(df2)
 
 
 
-Apply RaNCover. The matrix data must be converted to list data (as in the iGAS dataset).
+Apply RanNCover. The matrix data must be converted to list data (as in the iGAS dataset).
 ```{r}
 case.df = as.data.frame(which(sim2 == 1, arr.ind = TRUE))
 case.df$postcode = rownames(sim2)[case.df$row]
@@ -171,13 +171,14 @@ print((Sys.time() - start_time)/2)
 #only takes 5 minuts on the i5 laptop.
 ```
 
-Compare with the warning scores generated using a different cylinder size
 
 ```{r}
 case.df.epidemic =  which(epi.matrix > 0,  arr.ind = T)
 case.df$true_positive = apply(case.df, 1, function(x){ ( as.numeric(x['row']) %in% case.df.epidemic[,'row']) & (as.numeric(x['SAMPLE_DT_numeric']) %in% (case.df.epidemic[,'col'] + 39) )})
 # add 39 beacuse epi.matrix starts from time index 40.
 ```
+
+Compare with the warning scores generated using a different cylinder size
 
 ```{r}
 #case.df.warning.score.old = case.df$warning.score
