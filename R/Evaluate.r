@@ -1,11 +1,11 @@
 
-source("utils.R")
+source("R/utils.R")
 #library(sf)
 library(KernSmooth)
 #library(spatstat)
 #library(truncnorm)
-source("surveillance_utils.R")
-source("plot_utils.R")
+source("R/surveillance_utils.R")
+source("R/plot_utils.R")
 
 #load('Data/postcode2coord.Rdata')
 # UK range (latitude and longitude)
