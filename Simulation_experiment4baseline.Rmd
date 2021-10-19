@@ -5,7 +5,7 @@ title: "Simulation experiment"
 
 ```{r}
 size_factor_epi = 4
-n.endemic_cases = 5000
+n.endemic_cases = 1000
 label.str = paste(as.character(size_factor_epi), as.character(n.endemic_cases),  sep = '_')
 ```
 
@@ -27,8 +27,8 @@ and a temporal trend (saved in `time.factor`).
 #population = Population_[idx, 2]
 #names(population)  = Population_[idx, 1]
 #save(population, file = "Data/population_of_england.RData")
-load("Data/population_of_england.RData")
-load('Data/time.factor.RData')
+load("Data/population_of_england.RData_")
+load('Data/time.factor.RData_')
 head(population)
 ```
 
@@ -51,7 +51,7 @@ Map aggregated synthetic data to their geographical coordinates.
 
 
 ```{r}
-load("Data/geo.location_of_england.RData")
+load("Data/geo.location_of_england.RData_")
 df.population = cbind(geo.location[idx,], sample.population)
 df.cases = cbind(geo.location[idx,], rowSums(sim))
 colnames(df.cases) = c('latitude', 'longitude', 'n.cases')
