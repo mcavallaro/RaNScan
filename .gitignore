@@ -81,8 +81,8 @@ vignettes/*.pdf
 
 /clutter/
 /clutter
-#*prospec*R
-#*prospec*r
+*prospec*R
+l*prospec*r
 *.zip
 *.7z
 
