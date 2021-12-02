@@ -84,7 +84,5 @@ Compute the warning score for each case:
 6 1142                 0  BS247EQ 51.34984 -2.917601        164 5710.103 -105.092027   0.014285714
 ```
 
-[1] M. Cavallaro, J. Coelho, D. Ready, V. Decraene, T. Lamagni, N. D. McCarthy, D. Todkill, M. J. Keeling,
-Cluster detection with random neighbourhood covering: application to invasive Group A Streptococcal disease, 2021
-
+[1] M. Cavallaro, J. Coelho, D. Ready, V. Decraene, T. Lamagni, N. D. McCarthy, D. Todkill, M. J. Keeling, Cluster detection with random neighbourhood covering: application to invasive Group A Streptococcal disease, 2021 medRxiv 2021.10.20.21264984; doi: https://doi.org/10.1101/2021.10.20.21264984
 
