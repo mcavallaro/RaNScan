@@ -81,10 +81,12 @@ vignettes/*.pdf
 
 /clutter/
 /clutter
-
-
+#*prospec*R
+#*prospec*r
 *.zip
 *.7z
+
+
 #statscan
 *.geo
 *.pop
