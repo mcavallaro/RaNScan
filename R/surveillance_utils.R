@@ -30,6 +30,7 @@ rcylinder2<-function(n.cylinders, observation.matrix, week.range, radia_and_heig
   #           row col
   # PL15 9NE 5851 231
   # SY11 3PN 6370 255
+
   if (sum(observation.matrix[, cols]) > 0){
     idx = sample(1:nrow(cases), n.cylinders, replace = T)
     y = postcode2coord[cases[idx,1], 'latitude']

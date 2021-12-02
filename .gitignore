@@ -83,11 +83,16 @@ vignettes/*.pdf
 /Manuscript
 /iforest
 /iforest/
+/sequences/
 
+*.zip
+*.7z
 #statscan
 *.geo
 *.pop
 *.cas
 *.prm
 
-.Rproj.user
+.Rbuildignore
+report.Rmd
+*25Oct21*

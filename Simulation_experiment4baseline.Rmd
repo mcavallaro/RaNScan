@@ -158,7 +158,8 @@ b.matrix = b.matrix / sum(b.matrix) * n.endemic_cases
 ```{r}
 set.seed(1)
 start_time <- Sys.time()
-cylinders = CreateCylinders(observation.matrix = sim2, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.2)
+#print(dim(df.cases2))
+cylinders = CreateCylinders(observation.matrix = sim2, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000, coord.df=df.cases2,  size_factor = 1.2)
 
 # set.seed(1)
 # cylinders2 = CreateCylinders(observation.matrix = sim2, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 100000, coord.df=df.cases2,  size_factor = 1.5)
@@ -166,7 +167,7 @@ cylinders = CreateCylinders(observation.matrix = sim2, baseline.matrix = b.matri
 case.df[,'warning.score'] = apply(case.df, 1, FUN=warning.score, cylinders)
 #case.df[,'warning.score2'] = apply(case.df, 1, FUN=warning.score, cylinders2)
 
-cat("estimate of computation time:","\n")
+cat("estimate of computation time:", "\n")
 print((Sys.time() - start_time)/2)
 #only takes 5 minuts on the i5 laptop.
 ```
@@ -210,7 +211,7 @@ case.df %>% head
 library(pROC)
 ROC = roc(case.df$true_positive, case.df$warning.score)
 print(ROC)
-#plot(ROC)
+plot(ROC)
 L = NROW(case.df)
 col = '#00000033'
 #png(paste0('Fig/ROC_',label.str,'.png'), width = 3.25, height = 3.25, units = 'in', res=400, pointsize = 13)
@@ -234,7 +235,7 @@ plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
      ylab=expression(italic(w)),
      col=ifelse(case.df$true_positive, "#d62728", "#1f77b4"),
      pch=ifelse(case.df$true_positive, 20, 1))
-png(paste0('Fig/ws_time_',label.str,'.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
+# png(paste0('Fig/ws_time_',label.str,'.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
 par(mfrow=c(1,1), mar=c(4,4,1,1))
 plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
      ylab=expression(italic(w)),
@@ -242,7 +243,7 @@ plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
      pch=ifelse(case.df$true_positive, 20, 1))
 legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"),
        pch=c(20,1))
-dev.off()
+# dev.off()
 ```
 
 
@@ -271,7 +272,7 @@ idx2 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (
 # plot(case.df[idx1,]$longitude, case.df[idx1,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA)
 # points(case.df[idx2,]$longitude, case.df[idx2,]$latitude, col='#d62728', pch=20, cex=1, ylab = NA, xlab=NA)
 #
-png(paste0('Fig/satscan_',label.str,'.png'), width =  4 *1.2 / 1.5, height = 3 *1.2 /1.5, units = 'in', res=400, pointsize = 20)
+# png(paste0('Fig/satscan_',label.str,'.png'), width =  4 *1.2 / 1.5, height = 3 *1.2 /1.5, units = 'in', res=400, pointsize = 20)
 par(mfrow = c(1, 1), mar=c(0,0,0,0) + 0.5)
 idx3=case.df$warning.score > 0.95
 plot(case.df[!idx3,]$longitude, case.df[!idx3,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA,  xlim=c(-0.58, 0.01), ylim=c(51.57, 51.8) )
@@ -281,10 +282,12 @@ points(case.df[idx3,]$longitude, case.df[idx3,]$latitude, col='#ff7f0e', pch=4, 
 plotBaseMap(add=T, Wales = F, onlyregion = T)
 sim.col=st_read('shape_files/satscan_output.shp')
 plot(sim.col[1], add=T, col=NA, border='#7f7f7f')
-dev.off()
+# dev.off()
 ```
+
+
 ```{r}
-png(paste0('Fig/end_epi_spatial_',label.str,'.png'), width =  4 *1.6, height = 3 *1.6, units = 'in', res=600, pointsize = 13)
+# png(paste0('Fig/end_epi_spatial_',label.str,'.png'), width =  4 *1.6, height = 3 *1.6, units = 'in', res=600, pointsize = 13)
 par(mfrow = c(1, 1), mar=c(1,1,1,1)+0.1)
 
 plot(case.df[idx1,]$longitude, case.df[idx1,]$latitude, col='#1f77b4',axes=F, pch=1, cex=1, ylab = NA, xlab=NA, ylim = c(50,56), xlim = c(-5.9, 1.8))
@@ -294,7 +297,7 @@ legend('topleft',
        c( expression(italic(w)>=0.95),
           expression(italic(w)<0.95),
           "True outbreak"), col=c("#ff7f0e", "#1f77b4", '#d62728'), pch=c(4,1,20), box.col = "white")
-dev.off()
+# dev.off()
 ```
 
 
