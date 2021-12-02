@@ -9,7 +9,7 @@ output:
 
 ```{r}
 library(spatstat)
-temporal.trend.function<-function(t,A=7, B=0.9){
+temporal.trend.function<-function(t, A=7, B=0.9){
   return (A/2*(sin(t) + 1) + B)
 }
 
