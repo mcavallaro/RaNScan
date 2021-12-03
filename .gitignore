@@ -79,8 +79,8 @@ vignettes/*.pdf
 *.bib
 
 
-/clutter/
-/clutter
+#/clutter/
+#/clutter
 *prospec*
 *prospec*
 *.zip
