@@ -1,5 +1,5 @@
 ---
-title: "ONS Census vs iGAS"
+title: "ONS Census"
 author: "Massimo Cavallaro"
 date: "17 August 2020"
 output: word_document
@@ -16,9 +16,9 @@ nomi = c("FULLNO", "ORDPATSX", "AGEYEAR", "Patient Postcode", "SAMPLE_DT", "RECE
 dat2 = a[, nomi]
 ```
 
-Add latidute longitude:
+Add latitude & longitude using `postcode.to.location2`:
 ```{r}
-source('utils.R')
+source('R/utils.R')
 #postcode.df = read.table("Data/ukpostcodes.csv", stringsAsFactors = F, sep=',', header = T)
 dat2[,c("latitude", "longitude")] = t(apply(dat2, 1, postcode.to.location2))
 ```
@@ -42,15 +42,16 @@ plot(st_geometry(B),  col=NA, border='black', lwd=0.8,  add=T)
 
 ## Census 2011: Headcounts and Household Estimates for Postcodes in England and Wales
 
+from https://www.nomisweb.co.uk/census/2011/postcode_headcounts_and_household_estimates.
 
-###Detail of release
-This release contains summary results – 2011 Census estimates of usual residents broken down by sex and the number of households with one or more usual residents – for unit postcodes in England and Wales. In addition to this, a separate table detailing the postcode/OA splits is provided.
+### Detail of release
+This release contains summary results - 2011 Census estimates of usual residents broken down by sex and the number of households with one or more usual residents - for unit postcodes in England and Wales. In addition to this, a separate table detailing the postcode/OA splits is provided.
 
 The postcode headcount datasets are supplied in CSV format. The two datasets have been split into four files each to make manipulation of the data easier. These files can be combined to form one dataset as required.
 
 Table 2 only contains information on postcodes that are split across Output Areas.
 
-###Description of the data
+### Description of the data
 Table 1 is laid out as follows:
 
 Postcode	Total (usual residents)	Males (usual residents)	Females (usual residents)   Occupied_Households (Households with at least one usual resident)
@@ -84,25 +85,6 @@ A small number of residences were initially reported in a different output area 
 # #all merged into Postcode_Estimates_Table_1.csv
 # Population_MR = NULL
 # Population_GL = NULL
-```
-
-
-
-
-For each postcode let's plot the population vs the total number of cases:
-
-```{r}
-Cases = as.data.frame(table(dat2$`Patient Postcode`))
-Population = read.table("Data/Postcode_Estimates_Table_1.csv", header=T, sep = ',', stringsAsFactors = F)
-tmp = merge(Cases, Population, by.x='Var1', by.y = 'Postcode')
-```
-
-
-
-```{r}
-plot(tmp$Total, tmp$Freq, log='xy', ylab='cases', xlab = 'population')
-Lm=lm(Freq~Total, tmp)
-points(tmp$Total,predict(Lm, newdata=tmp),col='red')
 ```
 
 
@@ -154,3 +136,14 @@ plot(st_geometry(B),  col=NA, border='black', lwd=0.8,  add=T)
 
 
 
+
+```{r}
+rm(list=ls())
+source('R/utils.R')
+postcode.df = read.table("Data/ukpostcodes.csv", stringsAsFactors = F, sep=',', header = T)
+Population = read.table("Data/Postcode_Estimates_Table_1.csv", header=T, sep = ',', stringsAsFactors = F)
+names(Population)[1] = 'Patient Postcode'
+Population[,c("latitude", "longitude")] = t(apply(Population, 1, postcode.to.location, postcode.df))
+Population$Patient.Postcode = apply(Population, 1, function(x){gsub(' ', '', x[1], fixed=T)})
+write.table(Population, file='Data/Postcode_Estimates_Table_with_coordinates3.csv', quote = F, row.names = F, sep=',')
+```

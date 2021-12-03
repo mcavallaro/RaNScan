@@ -3,7 +3,7 @@
 
 This repository contains code used in reference [1]. Please cite [1] if you find it useful.
 
-As a demonstration, we consider the synthetic data in `case.df` which have been simulated from baseline `baseline.matrix` (see `Simulation_experiment4baseline.Rmd`). For convenience, the data is also stored in
+As a demonstration, we consider the synthetic data in `case.df` which have been simulated from baseline `baseline.matrix` (see `Simulation_experiment_4baseline_England.Rmd`). For convenience, the data is also stored in
 the matrix `simulation.matrix`.
 
 ```
