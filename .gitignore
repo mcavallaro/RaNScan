@@ -79,8 +79,8 @@ vignettes/*.pdf
 *.bib
 
 
-#/clutter/
-#/clutter
+/clutter/
+/clutter
 *prospec*
 *prospec*
 *.zip
@@ -95,3 +95,4 @@ vignettes/*.pdf
 .Rbuildignore
 report.Rmd
 *25Oct21*
+
