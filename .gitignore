@@ -47,7 +47,7 @@ vignettes/*.pdf
 # local output file
 *.7z
 *.png
-*.pdf
+#*.pdf
 *.csv
 *.xlsx
 *.gif
