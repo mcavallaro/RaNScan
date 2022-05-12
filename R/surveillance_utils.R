@@ -216,9 +216,12 @@ warning.score<-function(case, cylinders, date.time.field = 'SAMPLE_DT_numeric'){
   # number of cylinder with `warning` flag that include location `i`
   warning = sum(cylinders$warning * in_circle * in_cylinder_height, na.rm=T)
   if (in_cylinder>0){
-    re = warning / in_cylinder
+    test = binom.test(warning, in_cylinder, p = 0.95, alternative = 'greater')
+    # re = warning / in_cylinder
+    #Wilson confidence intervals are implemented in prop.test
+    re = c(test$estimate, suppressWarnings(prop.test(warning, in_cylinder)$conf.int), test$p.value)
   }else{
-    re = 0
+    re = c(0,0,0,NA)
   } 
   return(re)
 }

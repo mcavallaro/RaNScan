@@ -1,28 +1,14 @@
----
-title: "Simulation experiment England"
-output: pdf_document
----
-
-```{r setup}
+## ----setup-----------------------------------------------------------------------------------------------------------------
 knitr::opts_knit$set(root.dir = "~/Documents/outbreak-detection/")
 getwd()
-```
 
-```{r}
+
+## --------------------------------------------------------------------------------------------------------------------------
 source('R/utils.R')
 source("R/Evaluate.r")
-```
 
-# Simulation of cases in England
 
-We first simulate *endemic* cases according to a given baseline.
-The baseline is assumed proportional to postcode population (spatial factor, saved in `population`) and 
-and to a temporal trend (temporal factor, saved in `time.factor`).
-`no.endemic_cases` is the total number of endemic cases to simulate.
-We make use of a utility function `Simulate()` that   calls `rpois()` to
- generate the count data and returns the simulated cases in matrix format (rows correspond to postcodes, columns correspond to detected time).
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------------
 n.endemic_cases = 5000
 size_factor_epi = 4 # multiply by this factor to scale the number of epidemic cases.
 label.str = paste(as.character(size_factor_epi), as.character(n.endemic_cases),  sep = '_')
@@ -30,25 +16,23 @@ load("Data/population_of_england.RData_")
 load('Data/time.factor.RData_')
 head(population)
 
-# Set the random generator seed
+
+## --------------------------------------------------------------------------------------------------------------------------
+# Set the random generator seed for reproducibility
 set.seed(1)
 # subsample 10000 postcodes for speed
 idx=sort(sample(length(population), 10000))
 sample.population = population[idx]
+# simulate the cases 
 end.matrix = Simulate(sample.population, time.factor[-1][1:100], n.endemic_cases)
-```
 
 
-Create a baseline matrix of the same dimension as the  observation matrix:
-```{r}
-b.matrix = sample.population %o% time.factor[-1][1:100]
-b.matrix = b.matrix / sum(b.matrix) * n.endemic_cases
-```
-
-Map data to geographical coordinates:
-```{r}
+## --------------------------------------------------------------------------------------------------------------------------
 #geo.location = t(sapply(names(population), postcode.to.location3))
 #save(geo.location, file = "Data/geo.location_of_england.RData")
+
+
+## --------------------------------------------------------------------------------------------------------------------------
 load("Data/geo.location_of_england.RData_")
 df.population = cbind(geo.location[idx,], sample.population)
 df.cases = cbind(geo.location[idx,], rowSums(end.matrix))
@@ -57,15 +41,15 @@ df.cases = as.data.frame(df.cases)
 head(df.cases)
 df = data.frame(longitude = rep(df.cases[,'longitude'], df.cases[,'n.cases']),
              latitude = rep(df.cases[,'latitude'], df.cases[,'n.cases']))
-```
 
-Simulate more cases around St Albans (postcode starting with AL1 and AL2) from time 40 to time 60.
-These represent an outbreak (the *epidemic* component).
-```{r}
+
+## --------------------------------------------------------------------------------------------------------------------------
 idx1 = grepl('AL1', rownames(end.matrix), fixed=T)
 idx1 = idx1 | grepl('AL2', rownames(end.matrix), fixed=T)
 cat("the number of postcodes starting with AL1 or AL2 is", sum(idx1))
- 
+
+
+## --------------------------------------------------------------------------------------------------------------------------
 # set.seed(1)
 save(".Random.seed",file="random_state_seed_1.RData") ## save current RNG state
 load("random_state_seed_1.RData")
@@ -81,15 +65,14 @@ epi.matrix[1:3,1:3]
 par(mar=c(4,4,1,1)+0.1)
 plot(40:59, colSums(epi.matrix), col=ifelse(colSums(epi.matrix) > 0,'#d62728','white'), xlab='t', pch=20, ylab='no. epidemic cases')
 #dev.off()
-```
 
-Aggregate epidemic and endemic cases and plot versus time and space.
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------------
 all.matrix = end.matrix
 all.matrix[1:sum(idx1), as.character(40:59)] = all.matrix[1:sum(idx1), as.character(40:59)] + epi.matrix
 
-# code that requires UK boundaries shape files is commented
+
+## --------------------------------------------------------------------------------------------------------------------------
 # source('R/plotBaseMap.r')
 # png(paste0('Fig/end_epi_panel_',label.str,'.png'), width = 4 * 1.2 * 2, height = 3 * 1.2 * 2, units = 'in', res=400, pointsize = 13)
 par(mfrow = c(2, 2)) #, mar=c(4,4,1,1)+0.1)
@@ -114,10 +97,10 @@ plot(df$longitude, df$latitude,axes=F, pch=20, col='#1f77b4', cex=0.1, xlab=NA, 
 plot(df2$longitude, df2$latitude,axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, main='endemic + epidemic', ylim = c(50,56))
 # plotBaseMap(add=T, Wales=F)
 # mtext('D', side=3, padj=2, at=1, cex=2)
-```
 
-Convert the matrix data containing the simulated observations into a data frame `case.df` (as in a realistic records of detected cases).
-```{r}
+
+
+## --------------------------------------------------------------------------------------------------------------------------
 case.df = as.data.frame(which(all.matrix == 1, arr.ind = TRUE))
 case.df$postcode = rownames(all.matrix)[case.df$row]
 for (i in 2:max(c(all.matrix))){
@@ -131,71 +114,59 @@ case.df$col = case.df$col - 1
 names(case.df) = c('row','SAMPLE_DT_numeric', 'postcode', 'latitude', 'longitude', 'population')
 case.df[, c('y','x')] = vlatlong2km(case.df[,c('latitude', 'longitude')])
 tail(case.df)
-```
 
 
-Mark the entries in `case.df` corresponding to the simulated outbreak (epidemic component) as `true_positive`:
-```{r}
+## --------------------------------------------------------------------------------------------------------------------------
+b.matrix = sample.population %o% time.factor[-1][1:100]
+b.matrix = b.matrix / sum(b.matrix) * n.endemic_cases
+
+
+## --------------------------------------------------------------------------------------------------------------------------
 case.df.epidemic =  which(epi.matrix > 0,  arr.ind = T)
 case.df$true_positive = apply(case.df, 1, function(x){ ( as.numeric(x['row']) %in% case.df.epidemic[,'row']) & (as.numeric(x['SAMPLE_DT_numeric']) %in% (case.df.epidemic[,'col'] + 39) )})
-# add 39 because epi.matrix starts from time index 40.
-```
+# add 39 beacuse epi.matrix starts from time index 40.
 
 
-# Apply RaNCover.
-
-We detect the outbreak events with RaNCover in two steps.
-First, we  randomly draw $N=1000000$  covering cylinders using the function `CreateCylinders()`.
-Then, we apply the function `warning.score()` to all entries in `case.df` in order to compute the warning scores $w$ (along with their Wilson 95% confidence intervals) and test that $w$ is significantly greater than 0.95.
-
-```{r echo=TRUE}
+## --------------------------------------------------------------------------------------------------------------------------
 # set.seed(1)
 save(".Random.seed",file="random_state_seed_2.RData") ## save current RNG state
 load("random_state_seed_2.RData")
 cylinders = CreateCylinders(observation.matrix = all.matrix, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000000, coord.df=df.cases2,  size_factor = 1.2)
 case.df[,c('warning.score', 'low','upp','p.value')] = t(apply(case.df, 1, FUN=warning.score, cylinders))
-```
+cat("estimate of computation time:", "\n")
 
-```{r}
+
+## --------------------------------------------------------------------------------------------------------------------------
 head(case.df)
-```
 
-Generate a second set of warning scores using slightly larger covering cylinders (`cylinders2`).
-```{r echo=TRUE}
+
+## --------------------------------------------------------------------------------------------------------------------------
 #set.seed(1)
 load("random_state_seed_2.RData")
 cylinders2 = CreateCylinders(observation.matrix = all.matrix, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000000, coord.df=df.cases2,  size_factor = 1.5)
 case.df[,c('warning.score2','low2','upp2','p.value2')] = t(apply(case.df, 1, FUN=warning.score, cylinders2))
-```
 
 
-Let us perform other two replicates with fewer cylinders (`n.cylinders = 500000`).
-```{r echo=TRUE}
+## --------------------------------------------------------------------------------------------------------------------------
 cylinders_a = CreateCylinders(observation.matrix = all.matrix, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 500000, coord.df=df.cases2,  size_factor = 1.2)
-ws_a = as.data.frame(t(apply(case.df, 1, FUN=warning.score, cylinders_a)))
+ws_a = apply(case.df, 1, FUN=warning.score, cylinders_a)
 cylinders_b = CreateCylinders(observation.matrix = all.matrix, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 500000, coord.df=df.cases2,  size_factor = 1.5)
-ws_b = as.data.frame(t(apply(case.df, 1, FUN=warning.score, cylinders_b)))
-names(ws_b) = c('warning.score', 'low','upp','p.value')
-names(ws_a) = c('warning.score', 'low','upp','p.value')
-```
+ws_b = apply(case.df, 1, FUN=warning.score, cylinders_b)
 
-# Plot results
 
-Plot widths of Wilson CIs.
-```{r}
-# png(paste0('widths_plot', label.str, '.png'), width = 4.25, height = 3.25, units = 'in', res=600, pointsize = 10)
+## --------------------------------------------------------------------------------------------------------------------------
+# png(paste0('widths_plot', label.str, '.png'), width = 3.25, height = 3.25, units = 'in', res=600, pointsize = 11)
 # par(mfrow=c(1,1), mar=c(4,4,1,1))
 plot(density(case.df$upp2 - case.df$low2), main=NA, col='#7f7f7f', xlab='Width of warning-score CI')
 lines(density(case.df$upp - case.df$low), col='#1f77b4')
-lines(density(ws_b$upp - ws_b$low), col='#7f7f7f', lty=2)
-lines(density(ws_a$upp - ws_a$low), col='#1f77b4', lty=2)
+lines(density(ws_b[3,] - ws_b[2,]), col='#7f7f7f', lty=2)
+lines(density(ws_a[3,] - ws_a[2,]), col='#1f77b4', lty=2)
 #
 legend('topright', legend = c("V1, N=10^6", "V2, N=10^6","V1, N=5x10^5", "V2, N=5x10^5"), col=c('#1f77b4', '#7f7f7f', '#1f77b4', '#7f7f7f'), lty=c(1,1,2,2))
 # dev.off()
-```
 
-Compare the warning scores generated using different cylinder sizes.
-```{r}
+
+## --------------------------------------------------------------------------------------------------------------------------
 #case.df.warning.score.old = case.df$warning.score
 ctest = cor.test( case.df$warning.score2, case.df$warning.score)
 ctest
@@ -210,17 +181,9 @@ plot(case.df$warning.score, case.df$warning.score2,
      xlab = expression(paste(italic(w),' (rep. 1)')), ylab = expression(paste(italic(w)," (rep. 2)")), col=colors, pch=ifelse(case.df$true_positive, 20,1))
 legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"), pch=c(20,1))
 #dev.off()
-```
 
 
-<!-- ```{r} -->
-<!-- case.df.endemic = as.data.frame(which(sim == 1, arr.ind = TRUE)) -->
-<!-- case.df %>% head -->
-<!-- ``` -->
- 
-Assess performance of using the area under the Receiver Operating Characteristic curve (ROC-AUC).
-
-```{r message=TRUE, warning=FALSE}
+## ----message=TRUE, warning=FALSE-------------------------------------------------------------------------------------------
 library(pROC)
 ROC = roc(case.df$true_positive, case.df$warning.score)
 print(ROC)
@@ -240,10 +203,13 @@ for (i in 1:5){
 }
 #dev.off()
 print(quantile(auc, c(0.025,0.5,0.975) ))
-```
-Plotting the warning scores vs time highlights when the outbreak happened.
 
-```{r}
+
+## --------------------------------------------------------------------------------------------------------------------------
+plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
+     ylab=expression(italic(w)),
+     col=ifelse(case.df$true_positive, "#d62728", "#1f77b4"),
+     pch=ifelse(case.df$true_positive, 20, 1))
 # png(paste0('Fig/ws_time_',label.str,'.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
 par(mfrow=c(1,1), mar=c(4,4,1,1))
 plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
@@ -253,12 +219,9 @@ plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
 legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"),
        pch=c(20,1))
 # dev.off()
-```
 
 
-Plot the location of detected cases and colour by their warning scores ($w > 0.95$ in orange).
-
-```{r}
+## --------------------------------------------------------------------------------------------------------------------------
 # palette = colorRampPalette(c('#1f77b4', '#d62728'))(100)
 idx1 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score < 0.95)
 #colors = palette[as.integer(case.df[idx,]$warning.score * 100)+1]
@@ -277,10 +240,9 @@ points(case.df[idx3,]$longitude, case.df[idx3,]$latitude, col='#ff7f0e', pch=4, 
 # sim.col=st_read('shape_files/satscan_output.shp')
 # plot(sim.col[1], add=T, col=NA, border='#7f7f7f')
 # dev.off()
-```
 
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------------
 # png(paste0('Fig/end_epi_spatial_',label.str,'.png'), width =  4 *1.6, height = 3 *1.6, units = 'in', res=600, pointsize = 13)
 par(mfrow = c(1, 1), mar=c(1,1,1,1)+0.1)
 
@@ -292,23 +254,19 @@ legend('topleft',
           expression(italic(w)<0.95),
           "True outbreak"), col=c("#ff7f0e", "#1f77b4", '#d62728'), pch=c(4,1,20), box.col = "white")
 # dev.off()
-```
 
 
-Test timeliness: 
-
-```{r echo=TRUE}
+## ----include=FALSE---------------------------------------------------------------------------------------------------------
 save(".Random.seed",file="random_state_seed_3.RData")
 load("random_state_seed_3.RData")
 for (week in 40:59){
   week.range = as.character(0:week)
-  cylinders = CreateCylinders(observation.matrix = all.matrix[,week.range], baseline.matrix = b.matrix[,week.range], emmtype = 'sim', week.range = week.range, n.cylinders = 1000000, coord.df=df.cases2,  size_factor = 1.2)
+  cylinders = CreateCylinders(observation.matrix = all.matrix[,week.range], baseline.matrix = b.matrix[,week.range], emmtype = 'sim', week.range = week.range, n.cylinders = 10000, coord.df=df.cases2,  size_factor = 1.2)
   case.df[,paste0('warning.score', as.character(week))] = apply(case.df, 1, FUN=warning.score, cylinders)[1,]
 }
-```
 
 
-```{r}
+## --------------------------------------------------------------------------------------------------------------------------
 library(viridisLite)
 palette=inferno(length(40:59),begin=0.15, end=0.85, direction=-1)
 
@@ -331,14 +289,4 @@ for(i in 1:NROW(case.df[case.df$true_positive,  ])){
 }
 axis(2, at=c(0,0.25,0.5,0.75,1))
 axis(1, at = seq(40,59))
-```
-
-
-
-
-
-
-
-
-
 

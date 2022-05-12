@@ -1,12 +1,11 @@
 ---
-title: "Surveillance 3D"
-author: "Massimo Cavallaro"
-date: "22 October 2019"
-output:
-  pdf_document: default
-  word_document: default
+title: "Simulation Experiment"
+date: "23 October 2019"
+output: pdf_document
 ---
 
+
+Define baseline intensity `Z` for the endemic component and an outbreak area `win`.
 ```{r}
 library(spatstat)
 temporal.trend.function<-function(t, A=7, B=0.9){
@@ -33,6 +32,7 @@ my_blues = c("#F7FBFF", "#DEEBF7", "#C6DBEF", "#9ECAE1", "#6BAED6","#4292C6","#2
 ColorRamp=colorRampPalette(c(my_blues))(1000)
 ```
 
+Generate point events for the baseline and the outbreak with `rpoispp`.
 ```{r}
 set.seed(1)
 baseline=lapply(1:n.weeks, function(t){
@@ -44,6 +44,8 @@ epidemics=lapply(c(0,0,0,0,1,1,1,1,0,0, 0,0,0,0,1,1,1,1,0,0), function(t){
 Max = max(unlist(lapply(Z, max)))
 ```
 
+
+Plot baseline intensity and point events for each time `t`.
 ```{r}
 # include=FALSE}
 #png('../Manuscript/data_points__.png', width = 3.25 *2, height = 3.25 *2, units = 'in', res=600, pointsize = 18)
@@ -51,7 +53,7 @@ Max = max(unlist(lapply(Z, max)))
 par(mfrow=c(3,3), mar=c(0.9, 0.9, 0.9, 0.5))
 for (i in 1:9){
   ex = max(Z[[i]])/ Max
-  ColorRamp_ex = ColorRamp[1:(ex * len(ColorRamp))]
+  ColorRamp_ex = ColorRamp[1:(ex * length(ColorRamp))]
 
   plot(baseline[[i]], cols='#473B54', pch=16, main=paste0('t=', as.character(i)), show.window = F)
   image(xx, yy, Z[[i]], add=T, col=ColorRamp_ex)
@@ -72,7 +74,11 @@ for (i in 1:9){
 ```
 
 
-```{r include=FALSE}
+
+
+
+Aggregate all observations in a `list` data structure.
+```{r}
 observations = list()
 for (i in 1:n.weeks){
   b = baseline[[i]]
@@ -89,17 +95,12 @@ observations = do.call(rbind,  observations)
 ```{r}
 writeLines(c("The number of observations is:", nrow(observations)))
 ```
-
+Randomly draw covering cylinders and compute the exceedance statistics  for each cylinder.
 ```{r}
 # x = seq(0,1,delta)
 # y = seq(0,1,delta)
 # z = lapply(1:10,
 #            function(i){outer(x, y, function(x,y){temporal.trend(i) * spatial.trend.function(x,y)})})
-# is_in_circle0<-function(Data, x, y, rho){
-#   d = sqrt((as.numeric(Data['x'])-x)^2 + (as.numeric(Data['y'])-y)^2 )
-#   res<-(d<rho) & !is.na(d)
-#   return(res)
-#}
 
 compute_cylinders<-function(cylinder, observations, tabulated.baseline){
   t.low = as.numeric(cylinder['t.low'])
@@ -107,23 +108,17 @@ compute_cylinders<-function(cylinder, observations, tabulated.baseline){
   x0 = as.numeric(cylinder['x'])
   y0 = as.numeric(cylinder['y'])
   rho = as.numeric(cylinder['rho'])
-
-  # in_circle<-apply(tabulated.baseline, 1, is_in_circle0,     x0, y0, rho)
   d = sqrt((tabulated.baseline$x - x0)^2 + (tabulated.baseline$y - y0)^2)
   in_circle = (d < rho) & !is.na(d)
-    
   in_height = (tabulated.baseline$t >= t.low) & (tabulated.baseline$t <= t.upp)
   mu = sum(tabulated.baseline[in_circle & in_height,]$z) * delta2 #multiply by delta2 as this is the bin size
   
 #   in_of_square = sum(in_circle & in_height) * delta2
 # #  out_of_square = pi * rho* rho - in_of_square
-#   # correct by taking into account that outsise the square there is nothing. 
 #   mu = mu * pi * rho *rho / in_of_square
-  
-  # in_circle<-apply(observations, 1, is_in_circle0, x0, y0, rho)
+
   d = sqrt((observations$x - x0)^2 + (observations$y - y0)^2)
-  in_circle = (d < rho) & !is.na(d)  
-  
+  in_circle = (d < rho) & !is.na(d)
   
   in_height = (observations$t >= t.low) & (observations$t <= t.upp)
   n_cases_in_cylinder = sum(in_circle & in_height)
@@ -132,9 +127,7 @@ compute_cylinders<-function(cylinder, observations, tabulated.baseline){
   p.val = ppois(n_cases_in_cylinder, lambda=mu, lower.tail=FALSE)
   return (c(n_cases_in_cylinder, mu, p.val))
 }
-```
 
-```{r}
 init = Sys.time()
 tabulated.baseline = expand.grid(xx,yy,1:n.weeks)
 names(tabulated.baseline) = c('x', 'y', 't')
@@ -173,14 +166,11 @@ cylinders = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x
 
 cylinders[,c('n_obs', 'mu',  'p.val')] = t(apply(cylinders, 1, compute_cylinders,
                                                   observations, tabulated.baseline))
-
-# cylinders$warning = apply(cylinders, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
-
 cylinders$warning = (cylinders['p.val'] < 0.05) & (cylinders['n_obs'] > 0)
-
 print(Sys.time() - init)
 ```
 
+To demonstrate that the methodology is robust to changes in cylinder size, make another set of cylinders with increased radia.
 ```{r}
 init=Sys.time()
 cylinders3 = cylinders
@@ -194,7 +184,7 @@ print(Sys.time() - init)
 ```
 
 
-
+Compute the warning scores.
 
 ```{r}
 warning.score<-function(observation, cylinders){
@@ -203,17 +193,8 @@ warning.score<-function(observation, cylinders){
   y = as.numeric(observation['y'])
   TT = as.numeric(observation['t'])
   
-  # in_circle = apply(cylinders, 1, function(X){
-  #   ifelse(sqrt((as.numeric(X['x']) - x)^2 + (as.numeric(X['y']) - y)^2) < as.numeric(X['rho']), 1, 0)
-  # })
   in_circle = as.integer(sqrt((cylinders$x - x)^2 + (cylinders$y - y)^2) < cylinders$rho)
-  
-  
-  # in_cylinder_height = apply(cylinders, 1,  function(X){
-  #   ifelse((as.numeric(X['t.low']) <= TT) & (as.numeric(X['t.upp']) >= TT), 1, 0)
-  # })
   in_cylinder_height = as.integer((cylinders$t.low <= TT) & (cylinders$t.upp >= TT))
-  
   
   # number of cylinders that include geo-coordinate of `case`
   in_cylinder = sum(in_circle * in_cylinder_height, na.rm=T)
@@ -227,11 +208,7 @@ warning.score<-function(observation, cylinders){
   } 
   return(re)
 }
-```
 
-
-
-```{r}
 init = Sys.time()
 observations$warning.score = apply(observations, 1, warning.score, cylinders)
 #observations$warning.score2 = apply(observations, 1, warning.score, cylinders2)
@@ -241,7 +218,7 @@ print(Sys.time() - init)
 ```
 
 
-
+Show that warning scores obtained from cylinders of different volumes are correlated and both informative.
 ```{r}
 #png('../Manuscript/corr_rho_simulation.png', width = 3.25 * 1.2, height = 3.25* 1.2, units = 'in', res=400) #, pointsize = 13)
 # par(mfrow=c(1,1))
@@ -292,40 +269,42 @@ print(c(c.test$estimate, c.test$p.value))
 <!-- dev.off() -->
 <!-- ``` -->
 
-```
-png('../Manuscript/prediction_points__.png', width = 3.25 *2, height = 3.25 *2, units = 'in', res=600, pointsize = 18)
-par(mfrow=c(3,3), mar=c(0.9,0.9,0.9,0.7))
-observations[,"warning.color"] = round(observations[,"warning.score"]  * 10) + 1 
-#library(viridis)
-#palette = viridis(11, begin = 0, end = 1)
-palette = colorRampPalette(c("blue", "red"))(11) ## (n)
-win2 = owin(poly = data.frame(x=c(0,1,1,0),y=c(0,0,1,1)) )
-for (i in 1:9){
-  idx = (observations$t == i)
-  colors = palette[observations[idx,"warning.color"]]
-  PPP = ppp(observations[idx,"x"], observations[idx,"y"], window = win2)
-  plot(PPP, cex=0.1,  pch=16, main=paste0('t=', as.character(i)), show.window = F)
 
-  ex = max(Z[[i]]) / Max
-  ColorRamp_ex = ColorRamp[1:(ex * len(ColorRamp))]
-  image(xx, yy, Z[[i]], add=T, col=ColorRamp_ex)
-#  plot(PPP, cex=0.1,  pch=16).
-  
-  if ((i == 7) | (i == 8) | (i == 9))
-    mtext(c('x' ), c(1), outer = F)
-  if ((i == 1) | (i == 4) | (i == 7))
-    mtext(c('y' ), c(2), outer = F)
-  if (i == 3)
-    mtext('B', at = 0.9, cex = 1.8, padj = 1.5)
+<!-- ``` -->
+<!-- png('../Manuscript/prediction_points__.png', width = 3.25 *2, height = 3.25 *2, units = 'in', res=600, pointsize = 18) -->
+<!-- par(mfrow=c(3,3), mar=c(0.9,0.9,0.9,0.7)) -->
+<!-- observations[,"warning.color"] = round(observations[,"warning.score"]  * 10) + 1  -->
+<!-- #library(viridis) -->
+<!-- #palette = viridis(11, begin = 0, end = 1) -->
+<!-- palette = colorRampPalette(c("blue", "red"))(11) ## (n) -->
+<!-- win2 = owin(poly = data.frame(x=c(0,1,1,0),y=c(0,0,1,1)) ) -->
+<!-- for (i in 1:9){ -->
+<!--   idx = (observations$t == i) -->
+<!--   colors = palette[observations[idx,"warning.color"]] -->
+<!--   PPP = ppp(observations[idx,"x"], observations[idx,"y"], window = win2) -->
+<!--   plot(PPP, cex=0.1,  pch=16, main=paste0('t=', as.character(i)), show.window = F) -->
 
-  points(observations[idx,"x"], observations[idx,"y"], col=colors, pch=16, cex=1)
-  if (i %in% 5:8){
-    plot(win, add=T, border='red')
-  }
-}
-dev.off()
-```
+<!--   ex = max(Z[[i]]) / Max -->
+<!--   ColorRamp_ex = ColorRamp[1:(ex * length(ColorRamp))] -->
+<!--   image(xx, yy, Z[[i]], add=T, col=ColorRamp_ex) -->
+<!-- #  plot(PPP, cex=0.1,  pch=16). -->
 
+<!--   if ((i == 7) | (i == 8) | (i == 9)) -->
+<!--     mtext(c('x' ), c(1), outer = F) -->
+<!--   if ((i == 1) | (i == 4) | (i == 7)) -->
+<!--     mtext(c('y' ), c(2), outer = F) -->
+<!--   if (i == 3) -->
+<!--     mtext('B', at = 0.9, cex = 1.8, padj = 1.5) -->
+
+<!--   points(observations[idx,"x"], observations[idx,"y"], col=colors, pch=16, cex=1) -->
+<!--   if (i %in% 5:8){ -->
+<!--     plot(win, add=T, border='red') -->
+<!--   } -->
+<!-- } -->
+<!-- dev.off() -->
+<!-- ``` -->
+
+Compute the ROC as an appropriate performance metric using the library `pROC`.
 
 ```{r}
 cc1 = pROC::roc(as.integer(warning) ~ warning.score, observations)
@@ -396,9 +375,9 @@ print(quantile(auc, c(0.025,0.5,0.975) ))
 
 
 ```{r warning=FALSE}
-png('../Manuscript/simulation_experiment_ROC_CORR.png',
- width = 3.25 *3, height = 3.25, units = 'in', res=600, pointsize = 20)
-par(mfrow=c(1,3))
+# png('../Manuscript/simulation_experiment_ROC_CORR.png',
+#  width = 3.25 *3, height = 3.25, units = 'in', res=600, pointsize = 20)
+# par(mfrow=c(1,3))
 
 col = '#00000033'
 cc = pROC::roc(as.integer(warning) ~ warning.score, observations)
@@ -431,7 +410,7 @@ color = ifelse(observations$warning, '#d6272855', '#1f77b455')
 pch = ifelse(observations$warning, 19, 1)
 plot(warning.score3 ~ warning.score, observations, xlab=expression(paste(italic(w), " (rep 1)")), ylab = expression(paste(italic(w), " (rep 2)")), col=color, pch=pch)
 mtext('C', 3, at = 0.1, padj = 2, cex=1.5)
-dev.off()
+# dev.off()
 
 ```
 
