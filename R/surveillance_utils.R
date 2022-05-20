@@ -20,6 +20,8 @@ f_radia_and_heights<-function(baseline.matrix, weeks=1:100){
   return(cbind(weeks, radia))
 }
 
+v.sample.int<-Vectorize(sample.int, 'n')
+
 rcylinder2<-function(n.cylinders, observation.matrix, week.range, radia_and_heights, postcode2coord){
   if (any(rownames(observation.matrix)=='NA')){
     cat("WARNING: any(rownames(observation.matrix)=='NA'")
@@ -47,19 +49,24 @@ rcylinder2<-function(n.cylinders, observation.matrix, week.range, radia_and_heig
 
     y = y + sin(theta) * random_radia
     x = x + cos(theta) * random_radia
-    tt = t
-    t = t + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1]/2))
-    t.low = t - round(radia_and_heights[,1] / 2)
+    tt = as.integer(t)
+    # t = t + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1]/2))
+    rrr = v.sample.int(as.integer(radia_and_heights[,1]) + 1, 1) - 1
+    t.low = tt - rrr
+    t.upp = t.low + as.integer(radia_and_heights[,1])
+    # t.low = t - round(radia_and_heights[,1] / 2)
     t.min = as.integer(week.range[1])
-    t.low = ifelse(t.low >= t.min, t.low, t.min)
-
-    t.upp = tt + round(radia_and_heights[,1] / 2)
     t.max = as.integer(week.range[2])
-    t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
-
-    t.low = as.integer(ifelse(t.low == t.max, t.low - 1, t.low))
     
-    return(data.frame(x=x, y=y, rho=rho, t.low=t.low, t.upp=t.upp))
+    t.upp = ifelse(t.low > t.min, t.upp, t.upp + (t.min - t.low))    
+    t.low = ifelse(t.low > t.min, t.low, t.min)
+    
+    t.low = ifelse(t.upp < t.max, t.low, t.low - (t.upp - t.max) )
+    t.upp = ifelse(t.upp < t.max, t.upp, t.max)
+    
+    # t.low = as.integer(ifelse( !(t.low == t.min) & (t.low == t.upp), t.low - 1, t.low))
+    t.low = as.integer(ifelse( (t.upp==t.max) & (t.low < t.min), t.min, t.low))
+    return(data.frame(x=x, y=y, rho=rho, t.low=t.low, t.upp=t.upp)) #, xo=x, yo=y, t=t, t.low1=t.low1, t.upp1=t.upp1, rrr=rrr, H=radia_and_heights[,1]
   }else{
     return(data.frame(x=double(), y=double(), rho=double(), t.low=integer(), t.upp=integer()))    
   }
@@ -105,15 +112,10 @@ is_in_circle<-function(Data, x, y, rho){
 
 compute<-function(cylinder, observation.matrix, baseline.matrix, postcode.locations){
   # cylinder is a spatio-temporal portion
-  # extract Postcodes and times contained in cyclinders
+  # extract Postcodes and times contained in cylinders
   t.range = as.character(as.integer(cylinder['t.low']):as.integer(cylinder['t.upp']))
   observations = observation.matrix[,t.range]
   baselines = baseline.matrix[,t.range]
-  
-  # # da vettorizzare:
-  # in_circle<-apply(postcode.locations, 1, is_in_circle,
-  #                  as.numeric(cylinder['x']), as.numeric(cylinder['y']), as.numeric(cylinder['rho']))
-  # vettorizzato
   d = sqrt(
     (as.numeric(postcode.locations$longitude) - as.numeric(cylinder['x']))^2 +
       (as.numeric(postcode.locations$latitude)  - as.numeric(cylinder['y']))^2
