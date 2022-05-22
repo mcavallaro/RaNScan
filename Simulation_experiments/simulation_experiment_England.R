@@ -1,14 +1,14 @@
-## ----setup--------------------------------------------------------------------
+## ----setup-----------------------------------------------------------------------------------------------------------------------------
 knitr::opts_knit$set(root.dir = "~/Documents/outbreak-detection/")
 getwd()
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 source('R/utils.R')
 source("R/Evaluate.r")
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 n.endemic_cases = 5000
 size_factor_epi = 4 # multiply by this factor to scale the number of epidemic cases.
 label.str = paste(as.character(size_factor_epi), as.character(n.endemic_cases),  sep = '_')
@@ -24,12 +24,12 @@ sample.population = population[idx]
 end.matrix = Simulate(sample.population, time.factor[-1][1:100], n.endemic_cases)
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 b.matrix = sample.population %o% time.factor[-1][1:100]
 b.matrix = b.matrix / sum(b.matrix) * n.endemic_cases
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 #geo.location = t(sapply(names(population), postcode.to.location3))
 #save(geo.location, file = "Data/geo.location_of_england.RData")
 load("Data/geo.location_of_england.RData_")
@@ -42,7 +42,7 @@ df = data.frame(longitude = rep(df.cases[,'longitude'], df.cases[,'n.cases']),
              latitude = rep(df.cases[,'latitude'], df.cases[,'n.cases']))
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 idx1 = grepl('AL1', rownames(end.matrix), fixed=T)
 idx1 = idx1 | grepl('AL2', rownames(end.matrix), fixed=T)
 cat("the number of postcodes starting with AL1 or AL2 is", sum(idx1))
@@ -64,7 +64,7 @@ plot(40:59, colSums(epi.matrix), col=ifelse(colSums(epi.matrix) > 0,'#d62728','w
 #dev.off()
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 all.matrix = end.matrix
 all.matrix[1:sum(idx1), as.character(40:59)] = all.matrix[1:sum(idx1), as.character(40:59)] + epi.matrix
 
@@ -95,7 +95,7 @@ plot(df2$longitude, df2$latitude,axes=F, pch=20, cex=0.1, xlab=NA, ylab=NA, main
 # mtext('D', side=3, padj=2, at=1, cex=2)
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 case.df = as.data.frame(which(all.matrix == 1, arr.ind = TRUE))
 case.df$postcode = rownames(all.matrix)[case.df$row]
 for (i in 2:max(c(all.matrix))){
@@ -111,40 +111,39 @@ case.df[, c('y','x')] = vlatlong2km(case.df[,c('latitude', 'longitude')])
 tail(case.df)
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 case.df.epidemic =  which(epi.matrix > 0,  arr.ind = T)
 case.df$true_positive = apply(case.df, 1, function(x){ ( as.numeric(x['row']) %in% case.df.epidemic[,'row']) & (as.numeric(x['SAMPLE_DT_numeric']) %in% (case.df.epidemic[,'col'] + 39) )})
 # add 39 because epi.matrix starts from time index 40.
 
 
-## ----echo=TRUE----------------------------------------------------------------
+## ----echo=TRUE-------------------------------------------------------------------------------------------------------------------------
 # set.seed(1)
 save(".Random.seed",file="random_state_seed_2.RData") ## save current RNG state
 load("random_state_seed_2.RData")
-cylinders = CreateCylinders(observation.matrix = all.matrix, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000, coord.df=df.cases2)
-# cylinders = CreateCylinders(observation.matrix = all.matrix, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000000, coord.df=df.cases2,  size_factor = 1.2)
-# case.df[,c('warning.score', 'low','upp','p.value')] = t(apply(case.df, 1, FUN=warning.score, cylinders))
+cylinders = CreateCylinders(observation.matrix = all.matrix, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000000, coord.df=df.cases2)
+case.df[,c('warning.score', 'low','upp','p.value')] = t(apply(case.df, 1, FUN=warning.score, cylinders))
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 head(case.df)
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 h = cylinders$t.upp - cylinders$t.low
 vol = cylinders$h * cylinders$rho^2
 cat("the volume of each cylinder is:", vol[1])
 cat("the number of case expected under the baseline model in the cylinders is", quantile(rnorm(100), c(0.05,0.5,0.95)))
 
 
-## ----echo=TRUE----------------------------------------------------------------
+## ----echo=TRUE-------------------------------------------------------------------------------------------------------------------------
 #set.seed(1)
 load("random_state_seed_2.RData")
 cylinders2 = CreateCylinders(observation.matrix = all.matrix, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000000, coord.df=df.cases2,  size_factor = 1.5)
 case.df[,c('warning.score2','low2','upp2','p.value2')] = t(apply(case.df, 1, FUN=warning.score, cylinders2))
 
 
-## ----echo=TRUE----------------------------------------------------------------
+## ----echo=TRUE-------------------------------------------------------------------------------------------------------------------------
 cylinders_a = CreateCylinders(observation.matrix = all.matrix, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 500000, coord.df=df.cases2,  size_factor = 1.2)
 ws_a = as.data.frame(t(apply(case.df, 1, FUN=warning.score, cylinders_a)))
 cylinders_b = CreateCylinders(observation.matrix = all.matrix, baseline.matrix =  b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 500000, coord.df=df.cases2,  size_factor = 1.5)
@@ -153,7 +152,7 @@ names(ws_b) = c('warning.score', 'low','upp','p.value')
 names(ws_a) = c('warning.score', 'low','upp','p.value')
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 # png(paste0('widths_plot', label.str, '.png'), width = 4.25, height = 3.25, units = 'in', res=600, pointsize = 10)
 # par(mfrow=c(1,1), mar=c(4,4,1,1))
 plot(density(case.df$upp2 - case.df$low2), main=NA, col='#7f7f7f', xlab='Width of warning-score CI')
@@ -165,7 +164,7 @@ legend('topright', legend = c("V1, N=10^6", "V2, N=10^6","V1, N=5x10^5", "V2, N=
 # dev.off()
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 #case.df.warning.score.old = case.df$warning.score
 ctest = cor.test( case.df$warning.score2, case.df$warning.score)
 ctest
@@ -182,7 +181,7 @@ legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"), 
 #dev.off()
 
 
-## ----message=TRUE, warning=FALSE----------------------------------------------
+## ----message=TRUE, warning=FALSE-------------------------------------------------------------------------------------------------------
 library(pROC)
 ROC = roc(case.df$true_positive, case.df$warning.score)
 print(ROC)
@@ -204,7 +203,7 @@ for (i in 1:5){
 print(quantile(auc, c(0.025,0.5,0.975) ))
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 # png(paste0('Fig/ws_time_',label.str,'.png'), width = 4 * 1.2, height = 3 * 1.2, units = 'in', res=400, pointsize = 13)
 par(mfrow=c(1,1), mar=c(4,4,1,1))
 plot(case.df$SAMPLE_DT_numeric, case.df$warning.score, xlab='t',
@@ -216,7 +215,7 @@ legend('bottomright', c('epidemic','endemic'), col=c("#d6272855", "#1f77b455"),
 # dev.off()
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 # palette = colorRampPalette(c('#1f77b4', '#d62728'))(100)
 idx1 = (case.df$SAMPLE_DT_numeric > 40 ) & ( case.df$SAMPLE_DT_numeric < 60) & (case.df$warning.score < 0.95)
 #colors = palette[as.integer(case.df[idx,]$warning.score * 100)+1]
@@ -237,7 +236,7 @@ points(case.df[idx3,]$longitude, case.df[idx3,]$latitude, col='#ff7f0e', pch=4, 
 # dev.off()
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 # png(paste0('Fig/end_epi_spatial_',label.str,'.png'), width =  4 *1.6, height = 3 *1.6, units = 'in', res=600, pointsize = 13)
 par(mfrow = c(1, 1), mar=c(1,1,1,1)+0.1)
 
@@ -251,7 +250,7 @@ legend('topleft',
 # dev.off()
 
 
-## ----echo=TRUE----------------------------------------------------------------
+## ----echo=TRUE-------------------------------------------------------------------------------------------------------------------------
 save(".Random.seed",file="random_state_seed_3.RData")
 load("random_state_seed_3.RData")
 for (week in 40:59){
@@ -261,7 +260,7 @@ for (week in 40:59){
 }
 
 
-## -----------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 library(viridisLite)
 palette=inferno(length(40:59),begin=0.15, end=0.85, direction=-1)
 

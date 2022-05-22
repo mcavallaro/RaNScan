@@ -165,13 +165,24 @@ for  (t.index in 5:n.weeks){
   idx = sample(1:nrow(observations.tmp), n.cylinders, replace=T)
   y0 = observations.tmp$y[idx] + sin(theta) * random_radia
   x0 = observations.tmp$x[idx] + cos(theta) * random_radia
-  t = observations.tmp$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1] / 2))
+  # t = observations.tmp$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1] / 2))
+  # t.low = t - round(radia_and_heights[,1]/2)
+  # t.low = ifelse(t.low > 0, t.low, 1)
+  # t.upp = t + round(radia_and_heights[,1]/2)
+  # t.max = max(observations.tmp$t)
+  # t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
   
-  t.low = t - round(radia_and_heights[,1]/2)
-  t.low = ifelse(t.low > 0, t.low, 1)
-  t.upp = t + round(radia_and_heights[,1]/2)
-  t.max = max(observations.tmp$t)
-  t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
+  v.sample.int<-Vectorize(sample.int, 'n')
+  rrr = v.sample.int(as.integer(radia_and_heights[,1]) + 1, 1) - 1
+  t.low =  observations$t[idx] - rrr
+  t.upp = t.low + as.integer(radia_and_heights[,1])
+  t.min = min(observations$t)
+  t.max = max(observations$t)
+  t.upp = ifelse(t.low > t.min, t.upp, t.upp + (t.min - t.low))    
+  t.low = ifelse(t.low > t.min, t.low, t.min)
+  t.low = ifelse(t.upp < t.max, t.low, t.low - (t.upp - t.max) )
+  t.upp = ifelse(t.upp < t.max, t.upp, t.max)
+  t.low = as.integer(ifelse( (t.upp==t.max) & (t.low < t.min), t.min, t.low))  
   
   cylinders.tmp = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations.tmp$x[idx],  original.y=observations.tmp$y[idx], original.t=observations.tmp$t[idx])
   
@@ -179,7 +190,6 @@ for  (t.index in 5:n.weeks){
                                                     observations.tmp, tabulated.baseline.tmp))
   
  # cylinders.tmp$warning = apply(cylinders.tmp, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
-  
   cylinders.tmp$warning = (cylinders.tmp$p.val < 0.05) & (cylinders.tmp$n_obs > 0)
   
   cylinders.list[[t.index]] = cylinders.tmp

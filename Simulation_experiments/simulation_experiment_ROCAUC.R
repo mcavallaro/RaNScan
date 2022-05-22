@@ -1,4 +1,4 @@
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 library(spatstat)
 temporal.trend.function<-function(t, A=7, B=0.9){
   return (A/2*(sin(t) + 1) + B)
@@ -24,7 +24,7 @@ my_blues = c("#F7FBFF", "#DEEBF7", "#C6DBEF", "#9ECAE1", "#6BAED6","#4292C6","#2
 ColorRamp=colorRampPalette(c(my_blues))(1000)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 set.seed(1)
 baseline=lapply(1:n.weeks, function(t){
   rpoispp(function(x,y){ temporal.trend.function(t) * spatial.trend.function(x,y) })})
@@ -35,7 +35,7 @@ epidemics=lapply(c(0,0,0,0,1,1,1,1,0,0, 0,0,0,0,1,1,1,1,0,0), function(t){
 Max = max(unlist(lapply(Z, max)))
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 # include=FALSE}
 #png('../Manuscript/data_points__.png', width = 3.25 *2, height = 3.25 *2, units = 'in', res=600, pointsize = 18)
 
@@ -62,7 +62,7 @@ for (i in 1:9){
 # dev.off()
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 observations = list()
 for (i in 1:n.weeks){
   b = baseline[[i]]
@@ -76,11 +76,11 @@ for (i in 1:n.weeks){
 observations = do.call(rbind,  observations)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 writeLines(c("The number of observations is:", nrow(observations)))
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 # x = seq(0,1,delta)
 # y = seq(0,1,delta)
 # z = lapply(1:10,
@@ -138,15 +138,27 @@ theta = runif(n.cylinders, 0, 2* pi)
 idx = sample(1:nrow(observations), n.cylinders, replace=T)
 y0 = observations$y[idx] + sin(theta) * random_radia
 x0 = observations$x[idx] + cos(theta) * random_radia
-t = observations$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1]/2))
+# t = observations$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1]/2))
+# 
+# t.low = t - round(radia_and_heights[,1]/2)
+# t.low = ifelse(t.low>0, t.low, 1)
+# t.upp = t.low + round(radia_and_heights[,1]/2) 
+# t.max = max(observations$t)
+# t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
 
-t.low = t - round(radia_and_heights[,1]/2)
-t.low = ifelse(t.low>0, t.low, 1)
-t.upp = t.low + round(radia_and_heights[,1]/2) 
+v.sample.int<-Vectorize(sample.int, 'n')
+rrr = v.sample.int(as.integer(radia_and_heights[,1]) + 1, 1) - 1
+t.low =  observations$t[idx] - rrr
+t.upp = t.low + as.integer(radia_and_heights[,1])
+t.min = min(observations$t)
 t.max = max(observations$t)
-t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
+t.upp = ifelse(t.low > t.min, t.upp, t.upp + (t.min - t.low))    
+t.low = ifelse(t.low > t.min, t.low, t.min)
+t.low = ifelse(t.upp < t.max, t.low, t.low - (t.upp - t.max) )
+t.upp = ifelse(t.upp < t.max, t.upp, t.max)
+t.low = as.integer(ifelse( (t.upp==t.max) & (t.low < t.min), t.min, t.low))
 
-cylinders = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations$x[idx],  original.y=observations$y[idx])
+cylinders = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations$x[idx],  original.y=observations$y[idx], original.t=observations$t[idx])
 
 cylinders[,c('n_obs', 'mu',  'p.val')] = t(apply(cylinders, 1, compute_cylinders,
                                                   observations, tabulated.baseline))
@@ -154,7 +166,13 @@ cylinders$warning = (cylinders['p.val'] < 0.05) & (cylinders['n_obs'] > 0)
 print(Sys.time() - init)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
+cat("the average number of observed events is", mean(cylinders$n_obs), '\n')
+cat("the average number of expected events is", mean(cylinders$mu), '\n')
+cat("cylinders' volume is: ", head(cylinders$rho ^2 * pi * (cylinders$t.upp - cylinders$t.low) ), '\n')
+
+
+## --------------------------------------------------------------------------------------------------------------------------------------
 init=Sys.time()
 cylinders3 = cylinders
 cylinders3$rho = cylinders3$rho * 1.4
@@ -166,7 +184,7 @@ cylinders3$warning = (cylinders3['p.val'] < 0.05) & (cylinders3['n_obs'] > 0)
 print(Sys.time() - init)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 warning.score<-function(observation, cylinders){
   # check if the location
   x = as.numeric(observation['x'])
@@ -197,7 +215,7 @@ observations$warning.score3 = apply(observations, 1, warning.score, cylinders3)
 print(Sys.time() - init)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 #png('../Manuscript/corr_rho_simulation.png', width = 3.25 * 1.2, height = 3.25* 1.2, units = 'in', res=400) #, pointsize = 13)
 # par(mfrow=c(1,1))
 color = ifelse(observations$warning, 'red', 'black')
@@ -208,7 +226,7 @@ c.test=cor.test(observations$warning.score, observations$warning.score3) #pearso
 print(c(c.test$estimate, c.test$p.value))
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 cc1 = pROC::roc(as.integer(warning) ~ warning.score, observations)
 cc2 = pROC::roc(as.integer(warning) ~ warning.score3, observations)
 
@@ -231,7 +249,7 @@ spec_sens_cc2 = colMeans(df2[idx,])
 print(spec_sens_cc2)
 
 
-## ----warning=FALSE--------------------------------------------------------------------------------------------------------
+## ----warning=FALSE---------------------------------------------------------------------------------------------------------------------
 options(warn = - 1)
 #conf_matrix<-table(ifelse(observations$warning.score2 > 0.95, T, F), observations$warning)
 # sens = caret::sensitivity(conf_matrix)
@@ -271,7 +289,7 @@ print(quantile(auc, c(0.025,0.5,0.975) ))
 #dev.off()
 
 
-## ----warning=FALSE--------------------------------------------------------------------------------------------------------
+## ----warning=FALSE---------------------------------------------------------------------------------------------------------------------
 # png('../Manuscript/simulation_experiment_ROC_CORR.png',
 #  width = 3.25 *3, height = 3.25, units = 'in', res=600, pointsize = 20)
 # par(mfrow=c(1,3))

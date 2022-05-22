@@ -1,4 +1,4 @@
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 library(spatstat)
 temporal.trend.function<-function(t,A=7, B=0.9){
   return (A/2*(sin(t) + 1) + B)
@@ -25,7 +25,7 @@ my_blues = c("#F7FBFF", "#DEEBF7", "#C6DBEF", "#9ECAE1", "#6BAED6","#4292C6","#2
 ColorRamp=colorRampPalette(c(my_blues))(1000)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 set.seed(1)
 baseline=lapply(1:n.weeks, function(t){
   rpoispp(function(x,y){ temporal.trend.function(t) * spatial.trend.function(x,y) })})
@@ -36,7 +36,7 @@ epidemics=lapply(c(0,0,0,0,1,1,1,1,0,0, 0,0,0,0,1,1,1,1,0,0), function(t){
 Max = max(unlist(lapply(Z, max)))
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 # include=FALSE}
 # png('../Manuscript/data_points__.png', width = 3.25 *2, height = 3.25 *2, units = 'in', res=600, pointsize = 18)
 
@@ -67,7 +67,7 @@ for (i in 1:9){
 
 
 
-## ----include=FALSE--------------------------------------------------------------------------------------------------------
+## ----include=FALSE---------------------------------------------------------------------------------------------------------------------
 observations = list()
 for (i in 1:n.weeks){
   b = baseline[[i]]
@@ -81,11 +81,11 @@ for (i in 1:n.weeks){
 observations = do.call(rbind,  observations)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 writeLines(c("The number of observations is:", nrow(observations)))
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 # x = seq(0,1,delta)
 # y = seq(0,1,delta)
 # z = lapply(1:10,
@@ -117,7 +117,7 @@ compute_cylinders<-function(cylinder, observations, tabulated.baseline){
 }
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 tabulated.baseline = expand.grid(xx,yy,1:n.weeks)
 names(tabulated.baseline) = c('x', 'y', 't')
 tabulated.baseline$z = apply(tabulated.baseline, 1,
@@ -133,7 +133,7 @@ correction.factor = total.cases / total.expected.cases
 tabulated.baseline$z = tabulated.baseline$z * correction.factor
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 cylinders.list = list()
 for  (t.index in 5:n.weeks){
   n.cylinders = 4000 / n.weeks * t.index
@@ -152,13 +152,24 @@ for  (t.index in 5:n.weeks){
   idx = sample(1:nrow(observations.tmp), n.cylinders, replace=T)
   y0 = observations.tmp$y[idx] + sin(theta) * random_radia
   x0 = observations.tmp$x[idx] + cos(theta) * random_radia
-  t = observations.tmp$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1] / 2))
+  # t = observations.tmp$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1] / 2))
+  # t.low = t - round(radia_and_heights[,1]/2)
+  # t.low = ifelse(t.low > 0, t.low, 1)
+  # t.upp = t + round(radia_and_heights[,1]/2)
+  # t.max = max(observations.tmp$t)
+  # t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
   
-  t.low = t - round(radia_and_heights[,1]/2)
-  t.low = ifelse(t.low > 0, t.low, 1)
-  t.upp = t + round(radia_and_heights[,1]/2)
-  t.max = max(observations.tmp$t)
-  t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
+  v.sample.int<-Vectorize(sample.int, 'n')
+  rrr = v.sample.int(as.integer(radia_and_heights[,1]) + 1, 1) - 1
+  t.low =  observations$t[idx] - rrr
+  t.upp = t.low + as.integer(radia_and_heights[,1])
+  t.min = min(observations$t)
+  t.max = max(observations$t)
+  t.upp = ifelse(t.low > t.min, t.upp, t.upp + (t.min - t.low))    
+  t.low = ifelse(t.low > t.min, t.low, t.min)
+  t.low = ifelse(t.upp < t.max, t.low, t.low - (t.upp - t.max) )
+  t.upp = ifelse(t.upp < t.max, t.upp, t.max)
+  t.low = as.integer(ifelse( (t.upp==t.max) & (t.low < t.min), t.min, t.low))  
   
   cylinders.tmp = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations.tmp$x[idx],  original.y=observations.tmp$y[idx], original.t=observations.tmp$t[idx])
   
@@ -166,7 +177,6 @@ for  (t.index in 5:n.weeks){
                                                     observations.tmp, tabulated.baseline.tmp))
   
  # cylinders.tmp$warning = apply(cylinders.tmp, 1, function(x){ifelse((x['p.val'] < 0.05) & (x['n_obs'] > 0), TRUE, FALSE)})
-  
   cylinders.tmp$warning = (cylinders.tmp$p.val < 0.05) & (cylinders.tmp$n_obs > 0)
   
   cylinders.list[[t.index]] = cylinders.tmp
@@ -176,7 +186,7 @@ rm(tabulated.baseline.tmp)
 rm(observations.tmp)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 warning.score<-function(observation, cylinders){
   # check if the location
   x = as.numeric(observation['x'])
@@ -202,20 +212,20 @@ warning.score<-function(observation, cylinders){
 # print(Sys.time() - init)
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 observations.list = list()
 for (t.index in 5:n.weeks){
   observations.list[[t.index]] = observations[observations$t <= t.index,]
 }
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 for (t.index in 5:n.weeks){
   observations.list[[t.index]]$warning.score = apply(observations.list[[t.index]], 1, warning.score, cylinders.list[[t.index]])
 }
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 tab.red = '#d62728'
 tab.blue = '#1f77b4'
 init_size = as.data.frame(table(observations.list[[20]]$t ))
@@ -289,7 +299,7 @@ legend('bottomright', c('outbreak, t=7','endemic, t=7'), lwd=c(1,1,NA),
 # dev.off()
 
 
-## -------------------------------------------------------------------------------------------------------------------------
+## --------------------------------------------------------------------------------------------------------------------------------------
 tab.red = '#d62728'
 tab.blue = '#1f77b4'
 init_size = as.data.frame(table(observations.list[[20]]$t ))

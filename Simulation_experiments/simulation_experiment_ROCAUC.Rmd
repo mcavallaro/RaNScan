@@ -154,20 +154,38 @@ theta = runif(n.cylinders, 0, 2* pi)
 idx = sample(1:nrow(observations), n.cylinders, replace=T)
 y0 = observations$y[idx] + sin(theta) * random_radia
 x0 = observations$x[idx] + cos(theta) * random_radia
-t = observations$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1]/2))
+# t = observations$t[idx] + round(runif(n.cylinders, -radia_and_heights[,1]/2, radia_and_heights[,1]/2))
+# 
+# t.low = t - round(radia_and_heights[,1]/2)
+# t.low = ifelse(t.low>0, t.low, 1)
+# t.upp = t.low + round(radia_and_heights[,1]/2) 
+# t.max = max(observations$t)
+# t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
 
-t.low = t - round(radia_and_heights[,1]/2)
-t.low = ifelse(t.low>0, t.low, 1)
-t.upp = t.low + round(radia_and_heights[,1]/2) 
+v.sample.int<-Vectorize(sample.int, 'n')
+rrr = v.sample.int(as.integer(radia_and_heights[,1]) + 1, 1) - 1
+t.low =  observations$t[idx] - rrr
+t.upp = t.low + as.integer(radia_and_heights[,1])
+t.min = min(observations$t)
 t.max = max(observations$t)
-t.upp = ifelse(t.upp <= t.max, t.upp, t.max)
+t.upp = ifelse(t.low > t.min, t.upp, t.upp + (t.min - t.low))    
+t.low = ifelse(t.low > t.min, t.low, t.min)
+t.low = ifelse(t.upp < t.max, t.low, t.low - (t.upp - t.max) )
+t.upp = ifelse(t.upp < t.max, t.upp, t.max)
+t.low = as.integer(ifelse( (t.upp==t.max) & (t.low < t.min), t.min, t.low))
 
-cylinders = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations$x[idx],  original.y=observations$y[idx])
+cylinders = data.frame(x=x0, y=y0, rho=rho, t.low=t.low, t.upp=t.upp, original.x=observations$x[idx],  original.y=observations$y[idx], original.t=observations$t[idx])
 
 cylinders[,c('n_obs', 'mu',  'p.val')] = t(apply(cylinders, 1, compute_cylinders,
                                                   observations, tabulated.baseline))
 cylinders$warning = (cylinders['p.val'] < 0.05) & (cylinders['n_obs'] > 0)
 print(Sys.time() - init)
+```
+Cylinder statistics:
+```{r}
+cat("the average number of observed events is", mean(cylinders$n_obs), '\n')
+cat("the average number of expected events is", mean(cylinders$mu), '\n')
+cat("cylinders' volume is: ", head(cylinders$rho ^2 * pi * (cylinders$t.upp - cylinders$t.low) ), '\n')
 ```
 
 To demonstrate that the methodology is robust to changes in cylinder size, make another set of cylinders with increased radia.

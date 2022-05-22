@@ -152,9 +152,8 @@ Then, we apply the function `warning.score()` to all entries in `case.df` in ord
 # set.seed(1)
 save(".Random.seed",file="random_state_seed_2.RData") ## save current RNG state
 load("random_state_seed_2.RData")
-cylinders = CreateCylinders(observation.matrix = all.matrix, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000, coord.df=df.cases2)
-# cylinders = CreateCylinders(observation.matrix = all.matrix, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000000, coord.df=df.cases2,  size_factor = 1.2)
-# case.df[,c('warning.score', 'low','upp','p.value')] = t(apply(case.df, 1, FUN=warning.score, cylinders))
+cylinders = CreateCylinders(observation.matrix = all.matrix, baseline.matrix = b.matrix, emmtype = 'sim', week.range = c(0,99), n.cylinders = 1000000, coord.df=df.cases2)
+case.df[,c('warning.score', 'low','upp','p.value')] = t(apply(case.df, 1, FUN=warning.score, cylinders))
 ```
 
 ```{r}
