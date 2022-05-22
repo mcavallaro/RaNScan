@@ -162,8 +162,8 @@ head(case.df)
 Cylinder's volume and cases expected:
 ```{r}
 h = cylinders$t.upp - cylinders$t.low
-vol = cylinders$h * cylinders$rho^2
-cat("the volume of each cylinder is:", vol[1])
+vol = h * cylinders$rho^2 * pi
+cat("the volume of each cylinder is:", vol[1], '\n')
 cat("the number of case expected under the baseline model in the cylinders is", quantile(rnorm(100), c(0.05,0.5,0.95)))
 ```
 
