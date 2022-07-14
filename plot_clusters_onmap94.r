@@ -1,12 +1,12 @@
-source('ranScanInit2.R')
-source('ranScanEvaluate.R')
-source("plotBaseMap.r")
+source('R/Init2.R')
+source('R/Evaluate.R')
+source("R/plotBaseMap.r")
 emmtype = '94.0'
 
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
 
 ranScanCreateObservationMatrices(case.file, emmtype, date.time.field = 'SAMPLE_DT_numeric')
-load(paste0("~/Outbreak/Data/", emmtype, "_obs.Rdata"))
+load(paste0("Data/", emmtype, "_obs.Rdata"))
 baseline.matrix = ranScanCreateBaselineMatrix(case.file)
 emmtype.factor = ranScanEmmtypeFactor(case.file)
 postcode2coord = ranScanPostcodeMap(observation.matrix)
