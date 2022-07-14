@@ -1,6 +1,6 @@
-source('ranScanInit2.R')
-source('ranScanEvaluate.R')
-source("plotBaseMap.r")
+source('R/Init2.R')
+source('R/Evaluate.R')
+source("R/plotBaseMap.r")
 emmtype = '108.1'
 
 # source("ranScanInit.r")
