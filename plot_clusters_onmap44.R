@@ -1,6 +1,6 @@
-source('Init2.R')
-source('Evaluate.R')
-source("plotBaseMap.r")
+source('R/Init2.R')
+source('R/Evaluate.R')
+source("R/plotBaseMap.r")
 emmtype = '44.0'
 
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
