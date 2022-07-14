@@ -1,6 +1,6 @@
-source('ranScanInit2.R')
-source('ranScanEvaluate.R')
-source("plotBaseMap.r")
+source('R/Init2.R')
+source('R/Evaluate.R')
+source("R/plotBaseMap.r")
 emmtype = '33.0'
 
 case.file = "Data/Full MOLIS dataset minus PII 20200918.xlsx"
