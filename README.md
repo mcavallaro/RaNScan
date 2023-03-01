@@ -1,7 +1,9 @@
 
 # Cluster detection with Random Neighbourhood Covering
 
-This repository contains code used in reference [1]. Please cite [1] if you find it useful.
+This repository contains software used in reference [1].
+It will be not be maintained for long. See https://github.com/mcavallaro/rancovr for the most recent implementation.
+ Please cite [1] if you find these repositories useful.
 
 As a demonstration, we consider the synthetic data in `case.df` which have been simulated from baseline `baseline.matrix` (see `Simulation_experiment_4baseline_England.Rmd`). For convenience, the data is also stored in
 the matrix `simulation.matrix`.
@@ -84,5 +86,4 @@ Compute the warning score for each case:
 6 1142                 0  BS247EQ 51.34984 -2.917601        164 5710.103 -105.092027   0.014285714
 ```
 
-[1] M. Cavallaro, J. Coelho, D. Ready, V. Decraene, T. Lamagni, N. D. McCarthy, D. Todkill, M. J. Keeling, Cluster detection with random neighbourhood covering: application to invasive Group A Streptococcal disease, 2021 medRxiv 2021.10.20.21264984; doi: https://doi.org/10.1101/2021.10.20.21264984
-
+[1] Cavallaro M, Coelho J, Ready D, Decraene V, Lamagni T, McCarthy ND, et al. (2022) Cluster detection with random neighbourhood covering: Application to invasive Group A Streptococcal disease. PLoS Comput Biol 18(11): e1010726. https://doi.org/10.1371/journal.pcbi.1010726.
